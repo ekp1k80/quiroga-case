@@ -1,17 +1,22 @@
 // src/lib/firebaseAdmin.ts
 import admin from "firebase-admin";
 
-const ServiceAccount = require("@/firebase-admin-sdk.json");
+function getAdminCreds() {
+  const raw = process.env.FIREBASE_ADMIN_CREDENTIALS;
+  if (!raw) throw new Error("Missing FIREBASE_ADMIN_CREDENTIALS env var");
+  const parsed = JSON.parse(raw);
+
+  // Firebase espera newlines reales en private_key
+  parsed.private_key = parsed.private_key?.replace(/\\n/g, "\n");
+  return parsed;
+}
 
 export function getAdminApp() {
   if (admin.apps.length > 0) return admin.app();
 
-  const projectId =
-    process.env.FIREBASE_CONFIG_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 
-  admin.initializeApp({
-    credential: admin.credential.cert(ServiceAccount),
-    projectId,
+	admin.initializeApp({
+    credential: admin.credential.cert(getAdminCreds()),
   });
 
   return admin.app();
