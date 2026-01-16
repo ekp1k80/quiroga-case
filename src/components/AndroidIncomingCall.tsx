@@ -148,14 +148,18 @@ export default function AndroidIncomingCall({
             <AnsweredBox>
               <AnsweredText>Conectado</AnsweredText>
               <SmallText>Podés disparar acá tu UI de “en llamada” o pasar a otra escena.</SmallText>
-              <HangUpLarge onClick={() => setPhase("ended")}>Colgar</HangUpLarge>
+              <HangUpLarge
+                // onClick={() => setPhase("ended")}
+                >Colgar</HangUpLarge>
             </AnsweredBox>
           )}
 
           {phase === "ringing" && (
             <BottomControls>
               <ControlCol>
-                <RoundButtonRed onClick={() => decline("declined")} aria-label="Colgar">
+                <RoundButtonRed
+                    // onClick={() => decline("declined")}
+                    aria-label="Colgar">
                   ⛔
                 </RoundButtonRed>
                 <ControlLabel>Colgar</ControlLabel>
