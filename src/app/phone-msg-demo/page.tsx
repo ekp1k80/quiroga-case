@@ -13,6 +13,7 @@ import ViewportWrapper from "@/components/ViewportWrapper";
 import AudioPlayer from "@/components/AudioPlayer";
 import { usePublicAudio } from "@/hooks/usePublicAudio";
 import { AudioVizConfig } from "@/data/packs";
+import { useFullscreen } from "@/hooks/useFullscreen";
 
 type Scene = "start" | "lock" | "religiousSpam" | "idle1"| "idle2" | "call" | "inCall" | "afterCall" | "done";
 
@@ -30,7 +31,7 @@ export default function PhoneScenePage() {
   // Control de tiempos (ajustá a gusto)
   const NOTIF_DELAY_MS = 1800;   // cuando aparece la notificación
   const NOTIF_VISIBLE_MS = 4500; // cuánto dura antes de pasar a llamada
-
+	const { enter } = useFullscreen();
   const { unlockNow, audioContextRef } = useSoundUnlock();
 
   const timersRef = useRef<number[]>([]);
@@ -44,6 +45,7 @@ export default function PhoneScenePage() {
   const ringSound = "incoming-call.mp3";
 
   const handleStart = async () => {
+		await enter()
     const ok = await unlockNow();
     // Preload notificación (WebAudio) para que salga instant
     if (ok && audioContextRef.current) {
