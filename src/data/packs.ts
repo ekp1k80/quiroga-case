@@ -42,20 +42,20 @@ export const PACKS: Record<string, Pack> = {
           gain: 1.5, minBinFrac: .2, gate: 0.1, gateSoft: 0.005
         },
       },
-      {
-        id: "acta1",
-        type: "audio",
-        title: "Acta — Declaración Cruzada",
-        key: "Prologo_del_prologo.mp3",
-        viz: {
-          gain: 1.5, minBinFrac: .2, gate: 0.1, gateSoft: 0.005
-        },
-      },
+      // {
+      //   id: "acta1",
+      //   type: "audio",
+      //   title: "Acta — Declaración Cruzada",
+      //   key: "Prologo_del_prologo.mp3",
+      //   viz: {
+      //     gain: 1.5, minBinFrac: .2, gate: 0.1, gateSoft: 0.005
+      //   },
+      // },
       {
         id: "doc1",
         type: "doc",
         title: "Acta PDF — Declaración Cruzada",
-        key: "docs/acta-cruzada.pdf",
+        key: "Acta_Declaraciones_Cruzadas_Sofia_Rivas_MAIL.pdf",
       },
     ],
   },

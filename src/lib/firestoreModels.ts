@@ -120,3 +120,79 @@ export async function touchSession(sessionId: string) {
   const ref = db().collection("sessions").doc(sessionId);
   await ref.set({ lastSeenAt: FieldValue.serverTimestamp() }, { merge: true });
 }
+
+export type PuzzleProgressDoc = {
+  packId: string;
+  puzzleId: string;
+  step: number; // 0-based
+  solved?: boolean;
+  updatedAt: FirebaseFirestore.FieldValue | FirebaseFirestore.Timestamp;
+  solvedAt?: FirebaseFirestore.FieldValue | FirebaseFirestore.Timestamp;
+};
+
+function progressDocId(packId: string, puzzleId: string) {
+  return `${packId}__${puzzleId}`;
+}
+
+export async function getPuzzleProgress(userId: string, packId: string, puzzleId: string) {
+  const ref = db()
+    .collection("users")
+    .doc(userId)
+    .collection("puzzleProgress")
+    .doc(progressDocId(packId, puzzleId));
+
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  return { id: snap.id, ...(snap.data() as any) } as PuzzleProgressDoc & { id: string };
+}
+
+export async function upsertPuzzleProgress(
+  userId: string,
+  packId: string,
+  puzzleId: string,
+  patch: Partial<PuzzleProgressDoc>
+) {
+  const ref = db()
+    .collection("users")
+    .doc(userId)
+    .collection("puzzleProgress")
+    .doc(progressDocId(packId, puzzleId));
+
+  await ref.set(
+    {
+      packId,
+      puzzleId,
+      updatedAt: FieldValue.serverTimestamp(),
+      ...patch,
+    },
+    { merge: true }
+  );
+}
+
+// lib/firestoreModels.ts (agregar al final)
+
+export type QrClaimDoc = {
+  code: string;
+  claimedAt: FirebaseFirestore.FieldValue | FirebaseFirestore.Timestamp;
+  packId?: string;
+  meta?: any;
+};
+
+export async function getQrClaim(userId: string, code: string) {
+  const ref = db().collection("users").doc(userId).collection("qrClaims").doc(code);
+  const snap = await ref.get();
+  if (!snap.exists) return null;
+  return { id: snap.id, ...(snap.data() as any) } as QrClaimDoc & { id: string };
+}
+
+export async function createQrClaim(userId: string, code: string, patch?: Partial<QrClaimDoc>) {
+  const ref = db().collection("users").doc(userId).collection("qrClaims").doc(code);
+  await ref.set(
+    {
+      code,
+      claimedAt: FieldValue.serverTimestamp(),
+      ...patch,
+    },
+    { merge: true }
+  );
+}

@@ -1,26 +1,30 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 
 type AndroidScreenProps = {
-	black?: boolean;
-	showStatusBard?: boolean,
+  black?: boolean;
+  showStatusBar?: boolean;
   fixedTime?: string; // "03:12"
-	onStart?: () => void;
+  onStart?: () => void;
   onEnd?: () => void;
   timerEnd?: number;
-	children?: React.ReactElement;
+  children?: React.ReactNode;
+
+  // NUEVO:
+  onToggleShade?: (open: boolean) => void;
 };
 
 export default function ViewportWrapper({
-	showStatusBard,
+  showStatusBar,
   fixedTime = "03:12",
-	onEnd,
-	onStart,
-	timerEnd,
-	black,
-	children
+  onEnd,
+  onStart,
+  timerEnd,
+  black,
+  children,
+  onToggleShade,
 }: AndroidScreenProps) {
   const timeParts = useMemo(() => {
     const [hh, mm] = fixedTime.split(":");
@@ -28,38 +32,65 @@ export default function ViewportWrapper({
   }, [fixedTime]);
 
   useEffect(() => {
-    if(onStart) onStart()
-    if(onEnd && timerEnd) setTimeout(() => { onEnd() }, timerEnd)
-  },[])
+    onStart?.();
+    let t: any;
+    if (onEnd && typeof timerEnd === "number") {
+      t = setTimeout(() => onEnd(), timerEnd);
+    }
+    return () => {
+      if (t) clearTimeout(t);
+    };
+  }, [onStart, onEnd, timerEnd]);
 
-	if(black) return (
-		<Viewport>
-      <PhoneFrameBlack></PhoneFrameBlack>
-		</Viewport>
-	)
+  // swipe-down simple desde la parte superior
+  const startY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const y = e.touches[0]?.clientY ?? 0;
+    if (y <= 60) startY.current = y;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (startY.current == null) return;
+    const y = e.touches[0]?.clientY ?? 0;
+    if (y - startY.current > 35) {
+      onToggleShade?.(true);
+      startY.current = null;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    startY.current = null;
+  };
+
+  if (black)
+    return (
+      <Viewport>
+        <PhoneFrameBlack />
+      </Viewport>
+    );
 
   return (
-    <Viewport>
+    <Viewport onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
       <PhoneFrame>
-				{
-					showStatusBard && (
-						<StatusBar>
-							<TimeSmall>
-								{timeParts.hh}:{timeParts.mm}
-							</TimeSmall>
-							<Icons>
-								<span>📶</span>
-								<span>📡</span>
-								<span>🔋</span>
-							</Icons>
-						</StatusBar>
-					)
-				}
-        
+        {showStatusBar && (
+          <StatusBar
+            role="button"
+            aria-label="Status bar"
+            onClick={() => onToggleShade?.(true)}
+          >
+            <TimeSmall>
+              {timeParts.hh}:{timeParts.mm}
+            </TimeSmall>
+            <Icons>
+              <span>📶</span>
+              <span>📡</span>
+              <span>🔋</span>
+            </Icons>
+          </StatusBar>
+        )}
 
-        <LockContent>
-					{children}
-        </LockContent>
+        <LockContent>{children}</LockContent>
       </PhoneFrame>
     </Viewport>
   );
@@ -106,7 +137,9 @@ const StatusBar = styled.div`
   justify-content: space-between;
   background: rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(8px);
-  z-index: 3;
+  z-index: 30;
+  cursor: pointer;
+  user-select: none;
 `;
 
 const TimeSmall = styled.div`
@@ -121,6 +154,7 @@ const Icons = styled.div`
   gap: 8px;
   font-size: 12px;
   opacity: 0.9;
+  color: #fff;
 `;
 
 const LockContent = styled.div`
@@ -131,30 +165,4 @@ const LockContent = styled.div`
   flex-direction: column;
   align-items: center;
   justify-content: center;
-`;
-
-const BigTime = styled.div`
-  font-size: 64px;
-  font-weight: 700;
-  letter-spacing: -1px;
-  font-variant-numeric: tabular-nums;
-  color: #fff;
-`;
-
-const DayText = styled.div`
-  margin-top: 8px;
-  font-size: 14px;
-  opacity: 0.75;
-  color: #fff;
-`;
-
-const GestureBar = styled.div`
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  height: 6px;
-  width: 120px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.2);
 `;

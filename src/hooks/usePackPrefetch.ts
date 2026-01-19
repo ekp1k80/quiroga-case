@@ -1,7 +1,8 @@
+// usePackPrefetch.ts
 "use client";
 
 import { PackFile } from "@/data/packs";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 
 type CacheEntry = {
   blob: Blob;
@@ -44,7 +45,41 @@ export function usePackPrefetch(packId: string, options?: Partial<Options>) {
   const [error, setError] = useState<string | null>(null);
 
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
+  const inflightRef = useRef<Map<string, Promise<void>>>(new Map());
+
   const [cacheVersion, setCacheVersion] = useState(0);
+
+  const fetchFileIntoCache = useCallback(async (f: PackFile) => {
+    if (cacheRef.current.has(f.id)) return;
+
+    // dedupe inflight
+    const existing = inflightRef.current.get(f.id);
+    if (existing) return existing;
+
+    const p = (async () => {
+      const fileRes = await fetch(`/api/r2-proxy?key=${encodeURIComponent(f.key)}`, {
+        cache: "force-cache",
+      });
+      if (!fileRes.ok) return;
+
+      const blob = await fileRes.blob();
+      const objectUrl = URL.createObjectURL(blob);
+
+      cacheRef.current.set(f.id, {
+        blob,
+        objectUrl,
+        contentType: fileRes.headers.get("content-type") ?? undefined,
+      });
+
+      setCacheVersion((v) => v + 1);
+    })()
+      .finally(() => {
+        inflightRef.current.delete(f.id);
+      });
+
+    inflightRef.current.set(f.id, p);
+    return p;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,6 +92,7 @@ export function usePackPrefetch(packId: string, options?: Partial<Options>) {
       // cleanup cache anterior
       for (const entry of cacheRef.current.values()) URL.revokeObjectURL(entry.objectUrl);
       cacheRef.current = new Map();
+      inflightRef.current = new Map();
       setCacheVersion((v) => v + 1);
 
       try {
@@ -79,28 +115,11 @@ export function usePackPrefetch(packId: string, options?: Partial<Options>) {
         const toPrefetch =
           opts.prefetch === "audio"
             ? packFiles.filter((f) => f.type === "audio")
-            : packFiles; // "all" = audio + doc
+            : packFiles; // "all"
 
         await fetchWithConcurrency(toPrefetch, opts.concurrency, async (f) => {
           if (cancelled) return;
-          if (cacheRef.current.has(f.id)) return;
-
-          const fileRes = await fetch(`/api/r2-proxy?key=${encodeURIComponent(f.key)}`, {
-            cache: "force-cache",
-          });
-
-          if (!fileRes.ok) return;
-
-          const blob = await fileRes.blob();
-          const objectUrl = URL.createObjectURL(blob);
-
-          cacheRef.current.set(f.id, {
-            blob,
-            objectUrl,
-            contentType: fileRes.headers.get("content-type") ?? undefined,
-          });
-
-          setCacheVersion((v) => v + 1);
+          await fetchFileIntoCache(f);
         });
 
         if (!cancelled) setLoading(false);
@@ -119,14 +138,13 @@ export function usePackPrefetch(packId: string, options?: Partial<Options>) {
       cancelled = true;
       for (const entry of cacheRef.current.values()) URL.revokeObjectURL(entry.objectUrl);
     };
-  }, [packId, opts.prefetch, opts.concurrency]);
+  }, [packId, opts.prefetch, opts.concurrency, fetchFileIntoCache]);
 
   function isCached(fileId: string) {
     return cacheRef.current.has(fileId);
   }
 
   function getObjectUrl(fileId: string) {
-    // audio/doc ambos: <audio src> o <iframe src> o <a href>
     return cacheRef.current.get(fileId)?.objectUrl ?? null;
   }
 
@@ -138,6 +156,14 @@ export function usePackPrefetch(packId: string, options?: Partial<Options>) {
     return cacheRef.current.get(fileId)?.contentType ?? null;
   }
 
+  // ✅ nuevo: traer un archivo si no está cacheado (doc o audio)
+  async function ensureCached(fileOrId: PackFile | string) {
+    const file =
+      typeof fileOrId === "string" ? files.find((f) => f.id === fileOrId) : fileOrId;
+    if (!file) return;
+    await fetchFileIntoCache(file);
+  }
+
   return {
     files,
     loading,
@@ -147,5 +173,6 @@ export function usePackPrefetch(packId: string, options?: Partial<Options>) {
     getObjectUrl,
     getBlob,
     getContentType,
+    ensureCached, // ✅
   };
 }

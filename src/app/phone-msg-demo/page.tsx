@@ -45,7 +45,7 @@ export default function PhoneScenePage() {
   const ringSound = "incoming-call.mp3";
 
   const handleStart = async () => {
-		await enter()
+		// await enter()
     const ok = await unlockNow();
     // Preload notificación (WebAudio) para que salga instant
     if (ok && audioContextRef.current) {
