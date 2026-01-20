@@ -10,7 +10,7 @@ export default function ChatDemoPage() {
     onDone: ({ response }) => {
         // if (response.effects?.open === "router") setShowRouter(true);
     },
-    });
+  });
 
 
   return (

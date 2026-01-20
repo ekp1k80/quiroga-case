@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionIdFromCookie } from "@/lib/sessionCookie";
-import { getSession, getUser, touchSession, setUserLevel, getQrClaim, createQrClaim } from "@/lib/firestoreModels";
+import { getSession, getUser, touchSession, getQrClaim, createQrClaim } from "@/lib/firestoreModels";
 import { QR_REWARDS, normCode } from "@/data/qrRewards";
 
 type Req = { code?: string };
@@ -78,26 +78,26 @@ export async function POST(req: Request) {
     }
   }
 
-  // Level up idempotente
-  let levelUp: Res["levelUp"] | undefined;
-  if (reward.setLevelTo != null) {
-    const target = reward.setLevelTo;
-    if (currentLevel < target) {
-      await setUserLevel(session.userId, String(target));
-      levelUp = { from: currentLevel, to: target };
-    }
-  }
+//   // Level up idempotente
+//   let levelUp: Res["levelUp"] | undefined;
+//   if (reward.setLevelTo != null) {
+//     const target = reward.setLevelTo;
+//     if (currentLevel < target) {
+//       await setUserLevel(session.userId, String(target));
+//       levelUp = { from: currentLevel, to: target };
+//     }
+//   }
 
-  // guardar claim si corresponde
-  if (reward.oneTime) {
-    await createQrClaim(session.userId, code, { meta: { levelUp } });
-  }
+//   // guardar claim si corresponde
+//   if (reward.oneTime) {
+//     await createQrClaim(session.userId, code, { meta: { levelUp } });
+//   }
 
   return NextResponse.json<Res>({
     ok: true,
     message: reward.message ?? "OK.",
     urls: reward.urls ?? [],
     effects: reward.effects ?? {},
-    levelUp,
+    // levelUp,
   });
 }

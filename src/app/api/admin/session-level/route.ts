@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession, setUserLevel } from "@/lib/firestoreModels";
+import { getSession } from "@/lib/firestoreModels";
 
 function isAdmin(req: Request) {
   const secret = process.env.ADMIN_SECRET;
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   const session = await getSession(sessionId.trim());
   if (!session) return NextResponse.json({ ok: false, error: "Session not found" }, { status: 404 });
 
-  await setUserLevel(session.userId, level.trim());
+  // await setUserLevel(session.userId, level.trim());
 
   return NextResponse.json({ ok: true });
 }

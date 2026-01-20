@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionIdFromCookie } from "@/lib/sessionCookie";
 import { getSession, getUser, touchSession } from "@/lib/firestoreModels";
 import { PACKS } from "@/data/packs";
+import { canAccess } from "@/data/levels";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ packId: string }> }) {
   const { packId } = await ctx.params;
@@ -24,37 +25,25 @@ export async function GET(_req: Request, ctx: { params: Promise<{ packId: string
   const pack = PACKS[packId];
   if (!pack) return NextResponse.json({ ok: false, error: "Pack not found" }, { status: 404 });
 
-  const userLevelNum = Number.parseInt(user.level, 10);
-  if (!Number.isFinite(userLevelNum) || userLevelNum < pack.minLevel) {
+  // ✅ Nuevo: gate completo
+  const progress = {
+    storyNode: user.storyNode,
+    flags: user.flags ?? [],
+    tags: user.tags ?? [],
+  };
+
+  if (!canAccess(progress, pack.requires ?? null)) {
     return NextResponse.json({ ok: false, error: "Not allowed" }, { status: 403 });
   }
 
-  // ✅ devolver keys + viz (solo para audios)
   const files = pack.files.map((f) => {
     if (f.type === "audio") {
-      return {
-        id: f.id,
-        type: f.type,
-        title: f.title,
-        key: f.key,
-        viz: f.viz ?? null, // opcional, pero estable para el frontend
-      };
+      return { id: f.id, type: f.type, title: f.title, key: f.key, viz: f.viz ?? null };
     }
-
-    // doc
-    return {
-      id: f.id,
-      type: f.type,
-      title: f.title,
-      key: f.key,
-    };
+    return { id: f.id, type: f.type, title: f.title, key: f.key };
   });
 
   await touchSession(sessionId);
 
-  return NextResponse.json({
-    ok: true,
-    packId: pack.id,
-    files,
-  });
+  return NextResponse.json({ ok: true, packId: pack.id, files });
 }

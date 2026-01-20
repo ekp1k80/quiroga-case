@@ -1,17 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ChatConsoleMessage } from "@/components/GameChatConsole";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ChatConsoleMessage, ChatApiMessage } from "@/components/GameChatConsole";
+import type { PackFile } from "@/data/packs";
+
+export type ChatChoice = { id: string; label: string };
+
+// ✅ lo que viene del backend
+export type BackendChatMessage =
+  | string
+  | { type: "packFile"; fileId: string; caption?: string };
 
 export type ChatFlowResponse = {
   ok: boolean;
-  messages: string[];
+  messages: BackendChatMessage[];
 
   blocked?: boolean;
   done?: boolean;
 
-  levelUp?: { from: number; to: number };
   effects?: Record<string, any>;
+  choices?: ChatChoice[];
 
   error?: string;
 };
@@ -20,9 +28,9 @@ export type UseChatFlowOptions = {
   packId: string;
   puzzleId: string;
 
-  endpoint?: string;       // default "/api/chat-flow"
-  typingDelayMs?: number;  // default 650
-  autoInit?: boolean;      // default true
+  endpoint?: string;
+  typingDelayMs?: number;
+  autoInit?: boolean;
 
   externallyDisabled?: boolean;
 
@@ -30,15 +38,11 @@ export type UseChatFlowOptions = {
     packId: string;
     puzzleId: string;
     response: ChatFlowResponse;
-    lastInput?: string; // normalized
+    lastInput?: string;
   }) => void;
 
-  onLevelUp?: (payload: { from: number; to: number; packId: string; puzzleId: string }) => void;
-
   onBlocked?: (payload: { packId: string; puzzleId: string; response: ChatFlowResponse }) => void;
-
   onOk?: (payload: { packId: string; puzzleId: string; response: ChatFlowResponse }) => void;
-
   onWrong?: (payload: { packId: string; puzzleId: string; response: ChatFlowResponse }) => void;
 };
 
@@ -50,21 +54,21 @@ function normalizeInput(s: string) {
   return (s ?? "").trim().toLowerCase();
 }
 
-function makeSystemMsg(text: string): ChatConsoleMessage {
-  return { id: crypto.randomUUID(), at: Date.now(), from: "system", text };
+function makeSystemMsg(payload: ChatApiMessage): ChatConsoleMessage {
+  return { id: crypto.randomUUID(), at: Date.now(), from: "system", text: payload };
 }
 
-function makePlayerMsg(text: string): ChatConsoleMessage {
-  return { id: crypto.randomUUID(), at: Date.now(), from: "player", text };
+function makePlayerMsg(payload: ChatApiMessage): ChatConsoleMessage {
+  return { id: crypto.randomUUID(), at: Date.now(), from: "player", text: payload };
 }
 
-/**
- * Chat flow: la API decide TODO:
- * - mensaje inicial / prompt actual (init sin input)
- * - bloqueo por nivel
- * - validación de respuesta
- * - level up
- */
+type PackIndex = {
+  files: PackFile[];
+  byId: Map<string, PackFile>;
+};
+
+type CacheEntry = { objectUrl: string; contentType?: string };
+
 export function useChatFlow(opts: UseChatFlowOptions) {
   const {
     packId,
@@ -74,19 +78,155 @@ export function useChatFlow(opts: UseChatFlowOptions) {
     autoInit = true,
     externallyDisabled = false,
     onDone,
-    onLevelUp,
     onBlocked,
     onOk,
     onWrong,
   } = opts;
 
   const [messages, setMessages] = useState<ChatConsoleMessage[]>([]);
+  const [choices, setChoices] = useState<ChatChoice[]>([]);
+
   const [sending, setSending] = useState(false);
   const [systemTyping, setSystemTyping] = useState(false);
   const [done, setDone] = useState(false);
   const [loadingInit, setLoadingInit] = useState(false);
 
   const disabled = useMemo(() => externallyDisabled || done, [externallyDisabled, done]);
+
+  // ✅ pack cache
+  const packRef = useRef<PackIndex | null>(null);
+  const packInflightRef = useRef<Promise<PackIndex> | null>(null);
+
+  // ✅ file blob cache (by fileId)
+  const fileCacheRef = useRef<Map<string, CacheEntry>>(new Map());
+  const fileInflightRef = useRef<Map<string, Promise<void>>>(new Map());
+
+  // cleanup object urls cuando cambia packId (o unmount)
+  useEffect(() => {
+    return () => {
+      for (const entry of fileCacheRef.current.values()) URL.revokeObjectURL(entry.objectUrl);
+      fileCacheRef.current.clear();
+      fileInflightRef.current.clear();
+      packRef.current = null;
+      packInflightRef.current = null;
+    };
+  }, [packId]);
+
+  const fetchPackIndex = useCallback(async (): Promise<PackIndex> => {
+    if (packRef.current) return packRef.current;
+    const inflight = packInflightRef.current;
+    if (inflight) return inflight;
+
+    const p = (async () => {
+      const res = await fetch(`/api/packs/${encodeURIComponent(packId)}`, { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error ?? "Pack fetch failed");
+
+      const files: PackFile[] = data.files ?? [];
+      const byId = new Map<string, PackFile>();
+      for (const f of files) byId.set(f.id, f);
+
+      const idx = { files, byId };
+      packRef.current = idx;
+      return idx;
+    })().finally(() => {
+      packInflightRef.current = null;
+    });
+
+    packInflightRef.current = p;
+    return p;
+  }, [packId]);
+
+  const ensureFileCached = useCallback(async (file: PackFile) => {
+    if (fileCacheRef.current.has(file.id)) return;
+
+    const existing = fileInflightRef.current.get(file.id);
+    if (existing) return existing;
+
+    const p = (async () => {
+      const fileRes = await fetch(`/api/r2-proxy?key=${encodeURIComponent(file.key)}`, {
+        cache: "force-cache",
+      });
+      if (!fileRes.ok) return;
+
+      const blob = await fileRes.blob();
+      const objectUrl = URL.createObjectURL(blob);
+
+      fileCacheRef.current.set(file.id, {
+        objectUrl,
+        contentType: fileRes.headers.get("content-type") ?? undefined,
+      });
+    })().finally(() => {
+      fileInflightRef.current.delete(file.id);
+    });
+
+    fileInflightRef.current.set(file.id, p);
+    return p;
+  }, []);
+
+  const resolveBackendMsgs = useCallback(
+    async (backendMsgs: BackendChatMessage[]): Promise<ChatApiMessage[]> => {
+      // fast path
+      if (!backendMsgs?.length) return [];
+
+      // si no hay packFile, devolvemos tal cual
+      const hasPackFile = backendMsgs.some((m) => typeof m !== "string" && m?.type === "packFile");
+      if (!hasPackFile) return backendMsgs as unknown as ChatApiMessage[];
+
+      let idx: PackIndex | null = null;
+      try {
+        idx = await fetchPackIndex();
+      } catch {
+        // si falla pack, degradamos a texto
+        return backendMsgs.map((m) =>
+          typeof m === "string" ? m : `[Archivo: ${m.fileId}]`
+        );
+      }
+
+      const out: ChatApiMessage[] = [];
+      for (const m of backendMsgs) {
+        if (typeof m === "string") {
+          out.push(m);
+          continue;
+        }
+
+        if (m.type === "packFile") {
+          const file = idx.byId.get(m.fileId);
+          if (!file) {
+            out.push(`[Archivo: ${m.fileId}]`);
+            continue;
+          }
+
+          // solo inline si es img; doc/audio quedan como texto por ahora
+          if (file.type !== "img") {
+            out.push(file.title ?? `[Archivo: ${m.fileId}]`);
+            continue;
+          }
+
+          await ensureFileCached(file);
+
+          const cached = fileCacheRef.current.get(file.id);
+          if (!cached?.objectUrl) {
+            out.push(file.title ?? `[Imagen: ${m.fileId}]`);
+            continue;
+          }
+
+          out.push({
+            type: "img",
+            src: cached.objectUrl,
+            alt: (file as any).alt ?? file.title ?? "",
+            caption: m.caption,
+          });
+          continue;
+        }
+
+        out.push("—");
+      }
+
+      return out;
+    },
+    [ensureFileCached, fetchPackIndex]
+  );
 
   const callApi = useCallback(
     async (input?: string) => {
@@ -96,7 +236,7 @@ export function useChatFlow(opts: UseChatFlowOptions) {
         body: JSON.stringify({
           packId,
           puzzleId,
-          input: input ?? "", // init manda ""
+          input: input ?? "",
         }),
       });
 
@@ -107,41 +247,41 @@ export function useChatFlow(opts: UseChatFlowOptions) {
     [endpoint, packId, puzzleId]
   );
 
-  /** Inicializa conversación desde API (prompt actual / bloqueo) */
   const init = useCallback(async () => {
     if (loadingInit) return;
     setLoadingInit(true);
 
     try {
-      const data = await callApi(""); // init sin input
+      const data = await callApi("");
 
-      // reset de estado
       setDone(!!data.done);
       setMessages([]);
+      setChoices(Array.isArray(data.choices) ? data.choices : []);
 
-      if (Array.isArray(data.messages) && data.messages.length) {
+      const resolved = await resolveBackendMsgs(Array.isArray(data.messages) ? data.messages : []);
+
+      if (resolved.length) {
         const now = Date.now();
         setMessages(
-          data.messages.map((t, i) => ({
+          resolved.map((m, i) => ({
             id: crypto.randomUUID(),
             at: now + i,
             from: "system",
-            text: t,
+            text: m,
           }))
         );
       }
 
       if (data.blocked) onBlocked?.({ packId, puzzleId, response: data });
-      if (data.levelUp) onLevelUp?.({ ...data.levelUp, packId, puzzleId });
       if (data.done) onDone?.({ packId, puzzleId, response: data });
     } catch {
       setMessages([makeSystemMsg("Error cargando el chat. Intentá recargar.")]);
+      setChoices([]);
     } finally {
       setLoadingInit(false);
     }
-  }, [callApi, loadingInit, onBlocked, onDone, onLevelUp, packId, puzzleId]);
+  }, [callApi, loadingInit, onBlocked, onDone, packId, puzzleId, resolveBackendMsgs]);
 
-  /** Enviar respuesta del jugador */
   const send = useCallback(
     async (rawText: string, normalizedText?: string) => {
       if (disabled || sending || loadingInit) return;
@@ -149,8 +289,8 @@ export function useChatFlow(opts: UseChatFlowOptions) {
       const normalized = normalizedText ?? normalizeInput(rawText);
       if (!normalized) return;
 
-      // mensaje del jugador
       setMessages((prev) => [...prev, makePlayerMsg(rawText)]);
+      setChoices([]);
 
       setSending(true);
       setSystemTyping(true);
@@ -168,28 +308,31 @@ export function useChatFlow(opts: UseChatFlowOptions) {
         return;
       }
 
-      // append mensajes del sistema
-      if (Array.isArray(data.messages) && data.messages.length) {
+      setChoices(Array.isArray(data.choices) ? data.choices : []);
+
+      const resolved = await resolveBackendMsgs(Array.isArray(data.messages) ? data.messages : []);
+
+      if (resolved.length) {
         const now = Date.now();
+        // @ts-ignore
         setMessages((prev) => [
           ...prev,
-          ...data.messages.map((t, i) => ({
+          ...resolved.map((m, i) => ({
             id: crypto.randomUUID(),
             at: now + i,
             from: "system",
-            text: t,
+            text: m,
           })),
         ]);
       }
 
-      // callbacks
       if (data.blocked) onBlocked?.({ packId, puzzleId, response: data });
-      if (data.levelUp) onLevelUp?.({ ...data.levelUp, packId, puzzleId });
       if (data.ok) onOk?.({ packId, puzzleId, response: data });
       else onWrong?.({ packId, puzzleId, response: data });
 
       if (data.done) {
         setDone(true);
+        setChoices([]);
         onDone?.({ packId, puzzleId, response: data, lastInput: normalized });
       }
 
@@ -204,20 +347,18 @@ export function useChatFlow(opts: UseChatFlowOptions) {
       callApi,
       onBlocked,
       onDone,
-      onLevelUp,
       onOk,
       onWrong,
       packId,
       puzzleId,
+      resolveBackendMsgs,
     ]
   );
 
-  /** Reinicia desde API (útil si cambia nivel y querés refrescar prompt) */
   const refresh = useCallback(async () => {
     await init();
   }, [init]);
 
-  // auto init al montar y al cambiar pack/puzzle
   useEffect(() => {
     if (!autoInit) return;
     init();
@@ -226,6 +367,7 @@ export function useChatFlow(opts: UseChatFlowOptions) {
 
   return {
     messages,
+    choices,
     sending,
     systemTyping,
     disabled,

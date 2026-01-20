@@ -3,18 +3,26 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 
+export type ChatApiMessage =
+  | string
+  | { type: "img"; src: string; alt?: string; caption?: string };
+
 export type ChatConsoleMessage = {
   id: string;
   at: number;
   from: "system" | "player";
-  text: string;
+  text: ChatApiMessage;
 };
+
+export type ChatChoice = { id: string; label: string };
 
 type Props = {
   title?: string;
   subtitle?: string;
 
   messages: ChatConsoleMessage[];
+
+  choices?: ChatChoice[];
 
   inputPlaceholder?: string;
   disabled?: boolean;
@@ -35,6 +43,7 @@ export default function GameChatConsole({
   title = "Terminal",
   subtitle,
   messages,
+  choices = [],
   inputPlaceholder = "Respuesta…",
   disabled,
   sending,
@@ -52,6 +61,13 @@ export default function GameChatConsole({
     const n = normalizeInput(value);
     return n.length > 0;
   }, [disabled, sending, value]);
+
+  const canChoose = useMemo(() => {
+    if (disabled) return false;
+    if (sending) return false;
+    if (systemTyping) return false;
+    return true;
+  }, [disabled, sending, systemTyping]);
 
   useEffect(() => {
     const el = listRef.current;
@@ -77,6 +93,32 @@ export default function GameChatConsole({
     requestAnimationFrame(() => inputRef.current?.focus());
   };
 
+  const choose = (c: ChatChoice) => {
+    if (!canChoose) return;
+    onSend(c.label, c.id);
+    setValue("");
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const renderBubble = (m: ChatConsoleMessage) => {
+    const isPlayer = m.from === "player";
+
+    if (typeof m.text === "string") {
+      return <Bubble $player={isPlayer}>{m.text}</Bubble>;
+    }
+
+    if (m.text.type === "img") {
+      return (
+        <ImageBubble $player={isPlayer}>
+          <ChatImage src={m.text.src} alt={m.text.alt ?? ""} />
+          {m.text.caption ? <ImageCaption>{m.text.caption}</ImageCaption> : null}
+        </ImageBubble>
+      );
+    }
+
+    return <Bubble $player={isPlayer}>—</Bubble>;
+  };
+
   return (
     <Shell>
       <Header>
@@ -86,7 +128,11 @@ export default function GameChatConsole({
         </HeaderLeft>
 
         <HeaderRight>
-          {sending ? <StatusPill>Enviando…</StatusPill> : systemTyping ? <StatusPill>…</StatusPill> : null}
+          {sending ? (
+            <StatusPill>Enviando…</StatusPill>
+          ) : systemTyping ? (
+            <StatusPill>…</StatusPill>
+          ) : null}
           {disabled ? <StatusPill>Bloqueado</StatusPill> : null}
         </HeaderRight>
       </Header>
@@ -101,7 +147,7 @@ export default function GameChatConsole({
           <>
             {messages.map((m) => (
               <Line key={m.id} $player={m.from === "player"}>
-                <Bubble $player={m.from === "player"}>{m.text}</Bubble>
+                {renderBubble(m)}
               </Line>
             ))}
 
@@ -119,22 +165,34 @@ export default function GameChatConsole({
       </Messages>
 
       <Composer>
-        <Input
-          ref={inputRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder={inputPlaceholder}
-          disabled={!!disabled || !!sending || !!systemTyping}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              submit();
-            }
-          }}
-        />
-        <SendBtn onClick={submit} disabled={!canSend}>
-          Enviar
-        </SendBtn>
+        {choices.length ? (
+          <QuickReplies aria-label="Opciones sugeridas">
+            {choices.map((c) => (
+              <Chip key={c.id} onClick={() => choose(c)} disabled={!canChoose}>
+                {c.label}
+              </Chip>
+            ))}
+          </QuickReplies>
+        ) : null}
+
+        <ComposerRow>
+          <Input
+            ref={inputRef}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={inputPlaceholder}
+            disabled={!!disabled || !!sending || !!systemTyping}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+          />
+          <SendBtn onClick={submit} disabled={!canSend}>
+            Enviar
+          </SendBtn>
+        </ComposerRow>
       </Composer>
     </Shell>
   );
@@ -225,6 +283,29 @@ const Bubble = styled.div<{ $player: boolean }>`
   white-space: pre-wrap;
 `;
 
+const ImageBubble = styled.div<{ $player: boolean }>`
+  max-width: min(720px, 92%);
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: ${(p) => (p.$player ? "rgba(140,255,180,0.14)" : "rgba(255,255,255,0.08)")};
+  display: grid;
+  gap: 8px;
+`;
+
+const ChatImage = styled.img`
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  display: block;
+`;
+
+const ImageCaption = styled.div`
+  font-size: 12px;
+  opacity: 0.8;
+  line-height: 1.25;
+`;
+
 const TypingBubble = styled.div`
   padding: 10px 12px;
   border-radius: 14px;
@@ -268,6 +349,33 @@ const Composer = styled.div`
   border-top: 1px solid rgba(255, 255, 255, 0.10);
   background: rgba(0, 0, 0, 0.20);
   padding: 10px;
+  display: grid;
+  gap: 10px;
+`;
+
+const QuickReplies = styled.div`
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+`;
+
+const Chip = styled.button`
+  border-radius: 999px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 12px;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+`;
+
+const ComposerRow = styled.div`
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
