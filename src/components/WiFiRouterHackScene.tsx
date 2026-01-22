@@ -155,7 +155,7 @@ export default function WiFiRouterHackScene({ fixedTime = "03:12", onAfter }: Pr
           {step === "intro" && (
             <Section>
               <Paragraph>
-                Martín abre “Redes y conexión” en el teléfono de Héctor.
+                Martín abre “Redes y conexión”.
               </Paragraph>
             </Section>
           )}

@@ -1,3 +1,4 @@
+// src/app/api/user/route.ts
 import { NextResponse } from "next/server";
 import { getSessionIdFromCookie } from "@/lib/sessionCookie";
 import { getSession, getUser, updateUserName, touchSession } from "@/lib/firestoreModels";
@@ -14,7 +15,16 @@ export async function GET() {
   const user = await getUser(session.userId);
   if (!user) return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
 
-  return NextResponse.json({ ok: true, user: { name: user.name, level: user.level } });
+  return NextResponse.json({
+    ok: true,
+    user: {
+      id: user.id,
+      name: user.name,
+      storyNode: user.storyNode,
+      flags: user.flags ?? [],
+      tags: user.tags ?? [],
+    },
+  });
 }
 
 export async function POST(req: Request) {

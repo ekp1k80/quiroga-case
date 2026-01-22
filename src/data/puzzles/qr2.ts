@@ -6,16 +6,16 @@ function nonEmpty(s: string) {
 }
 
 export const QR2_FLOW: PuzzleFlow = {
-  packId: "intro",
+  packId: "qr2",
   puzzleId: "qr2",
 
   // Antes: requiredLevel: 1
   // Si querés que SIEMPRE esté accesible, podés directamente omitir `requires`.
-  requires: { type: "story", node: "prologue-1" },
+  requires: { type: "story", node: "before-scan-qr2-chat" },
 
   // Antes: successLevel: 1
   // Si no avanza historia, dejalo vacío o usá flags/tags.
-  onSuccess: { addFlags: ["qr2-completed"] },
+  onSuccess: { addFlags: ["qr2-completed"], storyNode: "before-scan-qr2-chat" },
 
   blockedMessage: "Todavía no podés completar este QR.",
   steps: [

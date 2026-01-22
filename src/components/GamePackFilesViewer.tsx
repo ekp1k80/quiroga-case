@@ -1,11 +1,12 @@
+// src\components\GamePackFilesViewer.tsx
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import styled, { css } from "styled-components";
-import { usePackPrefetch } from "@/hooks/usePackPrefetch"; // ajustá el path si difiere
+import { usePackPrefetch } from "@/hooks/usePackPrefetch";
 import type { PackFile } from "@/data/packs";
-import AudioPlayer from "@/components/AudioPlayer"; // ajustá path
-import { AudioVizConfig } from "@/data/packs"; // ajustá si el type vive en otro lado
+import AudioPlayer from "@/components/AudioPlayer";
+import type { AudioVizConfig } from "@/data/packs";
 
 type Props = {
   packId: string;
@@ -13,18 +14,31 @@ type Props = {
   initialFileId?: string;
   prefetch?: "audio" | "all" | "none";
   onSelect?: (file: PackFile) => void;
+
+  /**
+   * ✅ se dispara cuando el usuario vio todos los files del pack (según cache local)
+   * Útil para que el orquestador cambie de pantalla inmediatamente.
+   */
+  onAllSeen?: (payload: { packId: string; fileIds: string[] }) => void;
+
+  /**
+   * ✅ si true, cuando se completa "all seen" llama al backend
+   * para que el server decida si avanza storyNode (sin exponer patch).
+   */
+  notifyBackendOnAllSeen?: boolean;
 };
 
 function isPdf(f: PackFile) {
-  // según tu schema: f.type === "doc" o "pdf" (lo adapto defensivo)
   return f.type === "doc";
 }
 function isAudio(f: PackFile) {
   return f.type === "audio";
 }
+function isImg(f: PackFile) {
+  return f.type === "img";
+}
 
 function displayName(f: PackFile) {
-  // según tu schema puede ser title/name
   return (f as any).title ?? (f as any).name ?? "Archivo";
 }
 
@@ -32,34 +46,59 @@ function displayDate(f: PackFile) {
   return (f as any).date ?? (f as any).createdAt ?? "";
 }
 
+function kindLabel(f: PackFile) {
+  if (isPdf(f)) return "Documento";
+  if (isAudio(f)) return "Audio";
+  if (isImg(f)) return "Imagen";
+  return "Archivo";
+}
+
 function isLocked(f: PackFile) {
-  // si tu API ya filtra desbloqueados, esto casi ni se usa, pero queda.
   return Boolean((f as any).locked);
 }
 
-/** Mejora el "fit" en visores nativos de PDF (Chrome/Edge suelen obedecer) */
 function withPdfViewerHints(url: string) {
-  // fragmentos típicos: view=FitH, zoom=page-width, toolbar=0
-  // No todos los visores lo respetan, pero no rompe nada.
   const frag = "view=FitH&zoom=page-width&toolbar=0&navpanes=0";
   return url.includes("#") ? url : `${url}#${frag}`;
+}
+
+function storageKey(packId: string) {
+  return `cq_seen_files__${packId}`;
+}
+
+function readSeen(packId: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(storageKey(packId));
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return new Set();
+    return new Set(arr.map(String));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeSeen(packId: string, seen: Set<string>) {
+  try {
+    localStorage.setItem(storageKey(packId), JSON.stringify(Array.from(seen)));
+  } catch {
+    // ignore
+  }
 }
 
 export default function GamePackFilesViewer({
   packId,
   title = "Archivos",
   initialFileId,
-  prefetch = "audio", // 👈 recomendado: audio + docs on-demand
+  prefetch = "audio",
   onSelect,
+  onAllSeen,
+  notifyBackendOnAllSeen = true,
 }: Props) {
   const { files, loading, error, cacheVersion, getObjectUrl, getBlob, ensureCached } = usePackPrefetch(packId, {
     prefetch,
     concurrency: 3,
   });
-
-  console.log("files to render")
-  console.log(files)
-
   const selectableFiles = useMemo(() => files ?? [], [files]);
 
   const initial = useMemo(() => {
@@ -74,7 +113,27 @@ export default function GamePackFilesViewer({
     [selectableFiles, selectedId]
   );
 
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(true);
+
+  // ✅ vistos (local)
+  const [seenIds, setSeenIds] = useState<Set<string>>(() => new Set());
+  const allSeenTriggeredRef = useRef(false);
+
+  // cargar vistos al cambiar pack
+  useEffect(() => {
+    allSeenTriggeredRef.current = false;
+    setSeenIds(readSeen(packId));
+  }, [packId]);
+
+  const markSeen = (fileId: string) => {
+    setSeenIds((prev) => {
+      if (prev.has(fileId)) return prev;
+      const next = new Set(prev);
+      next.add(fileId);
+      writeSeen(packId, next);
+      return next;
+    });
+  };
 
   const selectFile = async (f: PackFile) => {
     if (isLocked(f)) return;
@@ -82,8 +141,11 @@ export default function GamePackFilesViewer({
     onSelect?.(f);
     setDrawerOpen(false);
 
-    // ✅ trae docs/audio si no estaban cacheados
+    // trae file al cache
     await ensureCached(f);
+
+    // marcamos como visto (una vez que intentamos abrirlo)
+    markSeen(f.id);
   };
 
   useEffect(() => {
@@ -97,11 +159,12 @@ export default function GamePackFilesViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [packId, selectableFiles.length]);
 
-  // ✅ al cambiar selección, asegurar cache (por si selectedId se setea por efecto)
+  // al cambiar selección por efecto, cache + visto
   useEffect(() => {
     if (!selected) return;
     if (isLocked(selected)) return;
     ensureCached(selected);
+    markSeen(selected.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
@@ -110,30 +173,66 @@ export default function GamePackFilesViewer({
 
   const viewerUrl = useMemo(() => {
     if (!selected) return null;
-    const url = selectedObjectUrl; // ✅ sin fallback al proxy
+    const url = selectedObjectUrl;
     if (!url) return null;
     return isPdf(selected) ? withPdfViewerHints(url) : url;
   }, [selected, selectedObjectUrl]);
 
+  // ✅ all seen: si todos los files del pack están en vistos, disparamos 1 vez.
+  const allSeen = useMemo(() => {
+    if (!selectableFiles.length) return false;
+    // ignoramos locked en el conteo, por si el pack trae cosas “futuras”
+    const unlocked = selectableFiles.filter((f) => !isLocked(f));
+    if (!unlocked.length) return false;
+    return unlocked.every((f) => seenIds.has(f.id));
+  }, [selectableFiles, seenIds]);
+
+  useEffect(() => {
+    if (!allSeen) return;
+    if (allSeenTriggeredRef.current) return;
+    allSeenTriggeredRef.current = true;
+
+    const unlockedIds = selectableFiles.filter((f) => !isLocked(f)).map((f) => f.id);
+    onAllSeen?.({ packId, fileIds: unlockedIds });
+
+    if (!notifyBackendOnAllSeen) return;
+
+    // ✅ backend decide si avanza storyNode
+    fetch("/api/progress/files-seen", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        packId,
+        fileIds: unlockedIds,
+        // si preferís la otra modalidad:
+        // seenAll: true,
+      }),
+    }).catch(() => {});
+  }, [allSeen, selectableFiles, packId, onAllSeen, notifyBackendOnAllSeen]);
+
   return (
     <Shell>
-      {/* Top bar (mobile) */}
       <TopBar>
         <TopLeft>
           <DrawerBtn onClick={() => setDrawerOpen(true)} aria-label="Abrir archivos">
             ☰
           </DrawerBtn>
-          <TopTitle>{title}</TopTitle>
+          <TopTitle>
+            {title}
+            {allSeen ? <SeenPill>✓ vistos</SeenPill> : null}
+          </TopTitle>
         </TopLeft>
         <TopRight>
           {selected ? <TopSelected>{displayName(selected)}</TopSelected> : <TopSelected>—</TopSelected>}
         </TopRight>
       </TopBar>
 
-      {/* Sidebar normal (desktop) */}
       <SidebarDesktop>
         <SidebarHeader>
-          <SidebarTitle>{title}</SidebarTitle>
+          <SidebarTitle>
+            {title}
+            {allSeen ? <SeenPill>✓ vistos</SeenPill> : null}
+          </SidebarTitle>
           <SidebarMeta>
             {loading ? "Cargando…" : `${selectableFiles.length} archivo${selectableFiles.length === 1 ? "" : "s"}`}
           </SidebarMeta>
@@ -142,19 +241,25 @@ export default function GamePackFilesViewer({
         <List>
           {loading && <SkeletonList />}
           {!loading &&
-            selectableFiles.map((f) => {
+            selectableFiles.filter(f => !f.notShowFileViewer).map((f) => {
               const active = f.id === selectedId;
               const locked = isLocked(f);
+              const seen = seenIds.has(f.id);
+
+              const icon = locked ? "🔒" : isPdf(f) ? "📄" : isAudio(f) ? "🎧" : isImg(f) ? "🖼️" : "📁";
+
               return (
-                <Row key={f.id} $active={active} $locked={locked} onClick={() => selectFile(f)}>
-                  <IconBadge $kind={isPdf(f) ? "pdf" : "audio"} $locked={locked}>
-                    {locked ? "🔒" : isPdf(f) ? "📄" : "🎧"}
+                <Row key={f.id} $active={active} $locked={locked} $seen={seen} onClick={() => selectFile(f)}>
+                  <IconBadge $kind={isPdf(f) ? "pdf" : isAudio(f) ? "audio" : "img"} $locked={locked}>
+                    {icon}
                   </IconBadge>
 
                   <RowMain>
-                    <RowName title={displayName(f)}>{displayName(f)}</RowName>
+                    <RowName title={displayName(f)}>
+                      {displayName(f)} {seen && !locked ? <SeenTick aria-label="Visto">✓</SeenTick> : null}
+                    </RowName>
                     <RowMeta>
-                      <span>{isPdf(f) ? "Documento" : "Audio"}</span>
+                      <span>{kindLabel(f)}</span>
                       <span>{displayDate(f) || " "}</span>
                     </RowMeta>
                   </RowMain>
@@ -166,11 +271,13 @@ export default function GamePackFilesViewer({
         </List>
       </SidebarDesktop>
 
-      {/* Drawer (mobile/tablet) */}
       <DrawerOverlay $open={drawerOpen} onClick={() => setDrawerOpen(false)} />
       <SidebarDrawer $open={drawerOpen}>
         <DrawerHeader>
-          <DrawerTitle>{title}</DrawerTitle>
+          <DrawerTitle>
+            {title}
+            {allSeen ? <SeenPill>✓ vistos</SeenPill> : null}
+          </DrawerTitle>
           <DrawerClose onClick={() => setDrawerOpen(false)} aria-label="Cerrar">
             ✕
           </DrawerClose>
@@ -182,16 +289,22 @@ export default function GamePackFilesViewer({
             selectableFiles.map((f) => {
               const active = f.id === selectedId;
               const locked = isLocked(f);
+              const seen = seenIds.has(f.id);
+
+              const icon = locked ? "🔒" : isPdf(f) ? "📄" : isAudio(f) ? "🎧" : isImg(f) ? "🖼️" : "📁";
+
               return (
-                <Row key={f.id} $active={active} $locked={locked} onClick={() => selectFile(f)}>
-                  <IconBadge $kind={isPdf(f) ? "pdf" : "audio"} $locked={locked}>
-                    {locked ? "🔒" : isPdf(f) ? "📄" : "🎧"}
+                <Row key={f.id} $active={active} $locked={locked} $seen={seen} onClick={() => selectFile(f)}>
+                  <IconBadge $kind={isPdf(f) ? "pdf" : isAudio(f) ? "audio" : "img"} $locked={locked}>
+                    {icon}
                   </IconBadge>
 
                   <RowMain>
-                    <RowName title={displayName(f)}>{displayName(f)}</RowName>
+                    <RowName title={displayName(f)}>
+                      {displayName(f)} {seen && !locked ? <SeenTick aria-label="Visto">✓</SeenTick> : null}
+                    </RowName>
                     <RowMeta>
-                      <span>{isPdf(f) ? "Documento" : "Audio"}</span>
+                      <span>{kindLabel(f)}</span>
                       <span>{displayDate(f) || " "}</span>
                     </RowMeta>
                   </RowMain>
@@ -203,7 +316,6 @@ export default function GamePackFilesViewer({
         </List>
       </SidebarDrawer>
 
-      {/* Viewer */}
       <Viewer>
         {error ? (
           <EmptyState>
@@ -233,12 +345,9 @@ export default function GamePackFilesViewer({
               </PaneActions>
             </PaneHeader>
 
-            {/* PDF responsive: ocupa todo el pane. */}
             <PdfWrap>
               {viewerUrl ? (
-                // <object> suele “fittear” un poco mejor que iframe en algunos navegadores
                 <PdfObject data={viewerUrl} type="application/pdf" aria-label={displayName(selected)}>
-                  {/* fallback si no soporta embed */}
                   <FallbackBox>
                     <div>Tu navegador no puede embeber PDFs.</div>
                     <a href={viewerUrl} target="_blank" rel="noreferrer">
@@ -250,6 +359,31 @@ export default function GamePackFilesViewer({
                 <LoadingBox>Preparando documento… (cache: {cacheVersion})</LoadingBox>
               )}
             </PdfWrap>
+          </Pane>
+        ) : isImg(selected) ? (
+          <Pane>
+            <PaneHeader>
+              <PaneTitle>{displayName(selected)}</PaneTitle>
+              <PaneActions>
+                {viewerUrl && (
+                  <ActionLink href={viewerUrl} target="_blank" rel="noreferrer">
+                    Abrir
+                  </ActionLink>
+                )}
+              </PaneActions>
+            </PaneHeader>
+
+            <ImgWrap>
+              {viewerUrl ? (
+                <Img
+                  src={viewerUrl}
+                  alt={(selected as any).alt ?? displayName(selected)}
+                  draggable={false}
+                />
+              ) : (
+                <LoadingBox>Preparando imagen… (cache: {cacheVersion})</LoadingBox>
+              )}
+            </ImgWrap>
           </Pane>
         ) : (
           <Pane>
@@ -265,7 +399,6 @@ export default function GamePackFilesViewer({
             </PaneHeader>
 
             <AudioWrap>
-              {/* Usamos tu AudioPlayer sí o sí */}
               <AudioPlayer
                 src={viewerUrl as string}
                 blob={selectedBlob as Blob}
@@ -335,6 +468,19 @@ const TopTitle = styled.div`
   font-weight: 900;
   font-size: 13px;
   opacity: 0.95;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const SeenPill = styled.span`
+  font-size: 11px;
+  font-weight: 900;
+  padding: 6px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(140, 255, 180, 0.10);
+  opacity: 0.95;
 `;
 
 const TopSelected = styled.div`
@@ -370,6 +516,9 @@ const SidebarHeader = styled.div`
 const SidebarTitle = styled.div`
   font-weight: 900;
   font-size: 14px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 `;
 
 const SidebarMeta = styled.div`
@@ -423,6 +572,9 @@ const DrawerHeader = styled.div`
 const DrawerTitle = styled.div`
   font-weight: 900;
   font-size: 14px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 `;
 
 const DrawerClose = styled.button`
@@ -442,7 +594,7 @@ const List = styled.div`
   overflow: auto;
 `;
 
-const Row = styled.button<{ $active: boolean; $locked: boolean }>`
+const Row = styled.button<{ $active: boolean; $locked: boolean; $seen: boolean }>`
   width: 100%;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.10);
@@ -454,7 +606,7 @@ const Row = styled.button<{ $active: boolean; $locked: boolean }>`
   gap: 10px;
   align-items: center;
   cursor: ${({ $locked }) => ($locked ? "not-allowed" : "pointer")};
-  opacity: ${({ $locked }) => ($locked ? 0.55 : 1)};
+  opacity: ${({ $locked, $seen }) => ($locked ? 0.55 : $seen ? 0.78 : 1)};
   text-align: left;
 
   &:hover {
@@ -462,7 +614,7 @@ const Row = styled.button<{ $active: boolean; $locked: boolean }>`
   }
 `;
 
-const IconBadge = styled.div<{ $kind: "pdf" | "audio"; $locked: boolean }>`
+const IconBadge = styled.div<{ $kind: "pdf" | "audio" | "img"; $locked: boolean }>`
   width: 34px;
   height: 34px;
   border-radius: 12px;
@@ -470,7 +622,13 @@ const IconBadge = styled.div<{ $kind: "pdf" | "audio"; $locked: boolean }>`
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: ${({ $locked, $kind }) =>
-    $locked ? "rgba(255,255,255,0.06)" : $kind === "pdf" ? "rgba(120,180,255,0.12)" : "rgba(180,255,180,0.12)"};
+    $locked
+      ? "rgba(255,255,255,0.06)"
+      : $kind === "pdf"
+      ? "rgba(120,180,255,0.12)"
+      : $kind === "img"
+      ? "rgba(255,220,160,0.10)"
+      : "rgba(180,255,180,0.12)"};
 `;
 
 const RowMain = styled.div`
@@ -483,6 +641,12 @@ const RowName = styled.div`
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+`;
+
+const SeenTick = styled.span`
+  margin-left: 6px;
+  opacity: 0.9;
+  font-weight: 900;
 `;
 
 const RowMeta = styled.div`
@@ -567,7 +731,7 @@ const ActionLink = styled.a`
 
 const PdfWrap = styled.div`
   flex: 1;
-  min-height: 0; /* clave para que el embed no colapse */
+  min-height: 0;
   background: rgba(0, 0, 0, 0.18);
 `;
 
@@ -576,6 +740,24 @@ const PdfObject = styled.object`
   height: 100%;
   border: 0;
   display: block;
+`;
+
+const ImgWrap = styled.div`
+  flex: 1;
+  min-height: 0;
+  background: rgba(0, 0, 0, 0.18);
+  display: grid;
+  place-items: center;
+  padding: 12px;
+`;
+
+const Img = styled.img`
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+  object-fit: contain;
 `;
 
 const AudioWrap = styled.div`
@@ -646,8 +828,12 @@ const shimmer = css`
   animation: sk 1.2s ease-in-out infinite;
 
   @keyframes sk {
-    0% { background-position: 200% 0; }
-    100% { background-position: -200% 0; }
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
   }
 `;
 

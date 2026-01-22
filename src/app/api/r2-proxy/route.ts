@@ -1,17 +1,37 @@
+// src/app/api/r2-proxy/route.ts
 import { NextResponse } from "next/server";
-import { getR2SignedUrl } from "@/lib/r2SignedUrl";
+
+const ALLOWED_HOST_SUFFIXES = [
+  // poné acá tus hosts reales de R2 (ej: "<accountid>.r2.cloudflarestorage.com")
+  "r2.cloudflarestorage.com",
+  "cloudflarestorage.com",
+];
+
+function isAllowedSignedUrl(u: URL) {
+  if (u.protocol !== "https:") return false;
+  return ALLOWED_HOST_SUFFIXES.some((s) => u.hostname === s || u.hostname.endsWith("." + s));
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const key = searchParams.get("key");
+  const rawUrl = searchParams.get("url");
 
-  if (!key) {
-    return NextResponse.json({ ok: false, error: "Missing ?key=" }, { status: 400 });
+  if (!rawUrl) {
+    return NextResponse.json({ ok: false, error: "Missing ?url=" }, { status: 400 });
   }
 
-  const signedUrl = await getR2SignedUrl(key, 60 * 10);
+  let u: URL;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return NextResponse.json({ ok: false, error: "Invalid url" }, { status: 400 });
+  }
 
-  const r = await fetch(signedUrl);
+  if (!isAllowedSignedUrl(u)) {
+    return NextResponse.json({ ok: false, error: "URL not allowed" }, { status: 400 });
+  }
+
+  const r = await fetch(u.toString());
   if (!r.ok) {
     return NextResponse.json({ ok: false, error: `R2 fetch failed: ${r.status}` }, { status: 502 });
   }
@@ -23,7 +43,6 @@ export async function GET(req: Request) {
     status: 200,
     headers: {
       "Content-Type": contentType,
-      // opcional: cache corto para dev
       "Cache-Control": "private, max-age=60",
     },
   });

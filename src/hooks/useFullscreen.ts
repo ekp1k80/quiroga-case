@@ -40,11 +40,12 @@ export function useFullscreen() {
     }
   };
 
-  const isFullscreen = () =>
-    Boolean(
+  const isFullscreen = () => {
+    
+    return Boolean(
       document.fullscreenElement ||
       (document as any).webkitFullscreenElement
     );
-
+  }
   return { enter, exit, isFullscreen };
 }

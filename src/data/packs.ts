@@ -8,6 +8,7 @@ export type AudioVizConfig = {
 };
 
 export type AudioPackFile = {
+  notShowFileViewer?: boolean
   id: string;
   type: "audio";
   title: string;
@@ -16,6 +17,7 @@ export type AudioPackFile = {
 };
 
 export type DocPackFile = {
+  notShowFileViewer?: boolean
   id: string;
   type: "doc";
   title: string;
@@ -23,6 +25,7 @@ export type DocPackFile = {
 };
 
 export type ImgPackFile = {
+  notShowFileViewer?: boolean
   id: string;
   type: "img";
   title: string;
@@ -41,27 +44,57 @@ export type Pack = {
 };
 
 export const PACKS: Record<string, Pack> = {
-  intro: {
-    id: "intro",
-    requires: { type: "story", node: "prologue-1" satisfies StoryNode },
+  'chat-to-school-1': {
+    id: "chat-to-school-1",
+    requires: { type: "story", node: "chat-to-school-1" satisfies StoryNode },
     files: [
       {
-        id: "radio1",
-        type: "audio",
-        title: "Radio — Tanda 1",
-        key: "Prologo_del_prologo.mp3",
-        viz: { gain: 1.5, minBinFrac: 0.2, gate: 0.1, gateSoft: 0.005 },
+        id: "act3/foto_encuadrada.png",
+        type: "img",
+        title: "Foto Sofia - Hallada en casa de Hector - Tiene un recorte diario doblado adjunto",
+        key: "act3/foto_encuadrada.png",
       },
       {
-        id: "doc1",
+        id: "act3/recorte_diario_sofia_page.jpg",
+        type: "img",
+        title: "Recorte de diario 15/10/20",
+        key: "act3/recorte_diario_sofia_page.jpg",
+        notShowFileViewer: true
+      },
+    ],
+  },
+  'chat-to-school-2': {
+    id: "chat-to-school-2",
+    requires: { type: "story", node: "chat-to-school-2" satisfies StoryNode },
+    files: [
+      {
+        id: "act3/foto_encuadrada.png",
+        type: "img",
+        title: "Foto Sofia - Hallada en casa de Hector",
+        key: "act3/foto_encuadrada.png",
+      },
+      {
+        id: "act3/recorte_diario_sofia.pdf",
         type: "doc",
-        title: "Acta PDF — Declaración Cruzada",
-        key: "Acta_Declaraciones_Cruzadas_Sofia_Rivas_MAIL.pdf",
+        title: "Recorte de diario 15/10/20",
+        key: "act3/recorte_diario_sofia.pdf",
+      },
+    ],
+  },
+  'the-radio-audio': {
+    id: "the-radio-audio",
+    requires: { type: "story", node: "the-radio-audio" satisfies StoryNode },
+    files: [
+      {
+        id: "act3/the_radio.mp3",
+        type: "audio",
+        title: "Radio en la calle",
+        key: "act3/the_radio.mp3",
       },
     ],
   },
 
-  level2: {
+  example: {
     id: "level2",
     requires: {
       all: [

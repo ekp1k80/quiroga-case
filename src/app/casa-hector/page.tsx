@@ -50,7 +50,7 @@ export default function PhoneScenePage() {
     }
     // No pre-cargamos el ringtone con WebAudio porque lo reproducimos con <audio loop>,
     // pero podrías hacer un fetch “calentón” si querés.
-    setScene("idle7");
+    setScene("idle1");
   };
 
   return (

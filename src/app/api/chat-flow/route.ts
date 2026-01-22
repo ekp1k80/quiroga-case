@@ -32,6 +32,7 @@ type Res = {
   choices?: ResChoice[];
   error?: string;
   debug?: any;
+  advanced?: { from: string; to: string };
 };
 
 function norm(s: string) {
@@ -201,6 +202,7 @@ export async function POST(req: Request) {
       done: true,
       messages: reply.messages,
       effects: step.effectsOnDone,
+      advanced: { from: cfg.puzzleId, to: cfg.onSuccess?.storyNode },
       choices: undefined,
     });
   }
@@ -251,6 +253,7 @@ export async function POST(req: Request) {
     done: true,
     messages: step.okMessages,
     effects: step.effectsOnDone,
+    advanced: { from: cfg.puzzleId, to: cfg.onSuccess?.storyNode },
     choices: undefined,
   });
 }

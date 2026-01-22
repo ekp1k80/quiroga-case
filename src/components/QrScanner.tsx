@@ -1,20 +1,37 @@
+// src/components/QrScanner.tsx
 "use client";
 
 import React, { useEffect, useId, useRef, useState } from "react";
 import styled from "styled-components";
 import { Html5Qrcode } from "html5-qrcode";
-import { useQrClaim, QrClaimResponse } from "@/hooks/useQrClaim";
 
 type Props = {
-  onClaimed?: (res: QrClaimResponse) => void;
+  onCode: (code: string) => void | Promise<void>;
   onClose?: () => void;
+
+  /**
+   * Si true, para la cámara después de que onCode resuelve sin tirar error.
+   * Default true.
+   */
   stopOnSuccess?: boolean;
+
+  /**
+   * Cooldown entre lecturas (ms). Default 900.
+   */
+  cooldownMs?: number;
+
+  /**
+   * Para dev: permite simular código (solo en NODE_ENV !== "production").
+   */
+  devSimulate?: boolean;
 };
 
 export default function QrScanner({
-  onClaimed,
+  onCode,
   onClose,
   stopOnSuccess = true,
+  cooldownMs = 900,
+  devSimulate = true,
 }: Props) {
   /* ================= SSR-safe ID ================= */
   const reactId = useId();
@@ -22,7 +39,7 @@ export default function QrScanner({
 
   const qrRef = useRef<Html5Qrcode | null>(null);
 
-  const [status, setStatus] = useState<"starting" | "scanning" | "claiming" | "done" | "error">(
+  const [status, setStatus] = useState<"starting" | "scanning" | "processing" | "done" | "error">(
     "starting"
   );
 
@@ -32,24 +49,13 @@ export default function QrScanner({
   const isDev = process.env.NODE_ENV !== "production";
   const [debugCode, setDebugCode] = useState("");
 
-  const { claim, loading } = useQrClaim({
-    onSuccess: (res) => {
-      setStatus("done");
-      onClaimed?.(res);
-      if (stopOnSuccess) stopCamera();
-    },
-    onError: () => {
-      setStatus("scanning");
-    },
-  });
-
   /* ================= Camera ================= */
 
   const stopCamera = async () => {
     try {
       const inst = qrRef.current;
       if (inst) {
-        if (inst.isScanning) await inst.stop();
+        if ((inst as any).isScanning) await inst.stop();
         inst.clear();
       }
     } catch {
@@ -58,7 +64,8 @@ export default function QrScanner({
   };
 
   useEffect(() => {
-    if (isDev) return;
+    // en dev podés usar simulación (si querés igual arrancar cámara en dev, poné devSimulate=false)
+    if (isDev && devSimulate) return;
 
     let cancelled = false;
 
@@ -77,14 +84,29 @@ export default function QrScanner({
             if (cancelled || cooldown) return;
 
             const code = decodedText?.trim();
-            if (!code || code === lastCode) return;
+            if (!code) return;
+
+            // dedupe simple
+            if (code === lastCode) return;
 
             setCooldown(true);
-            setTimeout(() => setCooldown(false), 900);
+            setTimeout(() => setCooldown(false), cooldownMs);
 
             setLastCode(code);
-            setStatus("claiming");
-            await claim(code);
+            setStatus("processing");
+
+            try {
+              await onCode(code);
+              if (cancelled) return;
+
+              setStatus("done");
+              if (stopOnSuccess) await stopCamera();
+              else setStatus("scanning");
+            } catch {
+              if (cancelled) return;
+              // si onCode falla, volvemos a escanear
+              setStatus("scanning");
+            }
           },
           () => {}
         );
@@ -99,7 +121,7 @@ export default function QrScanner({
 
     return () => {
       cancelled = true;
-      stopCamera();
+      void stopCamera();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -107,9 +129,15 @@ export default function QrScanner({
   /* ================= DEV simulate ================= */
 
   const simulate = async () => {
-    if (!debugCode || loading) return;
-    setStatus("claiming");
-    await claim(debugCode.trim());
+    if (!debugCode) return;
+    console.log("test")
+    setStatus("processing");
+    try {
+      await onCode(debugCode.trim());
+      setStatus("done");
+    } catch {
+      setStatus("scanning");
+    }
   };
 
   /* ================= Render ================= */
@@ -123,7 +151,7 @@ export default function QrScanner({
       )}
 
       <ScannerArea>
-        {isDev ? (
+        {isDev && devSimulate ? (
           <DevBox>
             <DevInput
               value={debugCode}
@@ -136,7 +164,7 @@ export default function QrScanner({
           <>
             <CameraArea id={readerId} />
             <Overlay>
-              {status === "claiming" && <Spinner />}
+              {status === "processing" && <Spinner />}
               <Reticle />
             </Overlay>
           </>
@@ -168,6 +196,7 @@ const CloseBtn = styled.button`
   width: 36px;
   height: 36px;
   font-size: 18px;
+  cursor: pointer;
 `;
 
 const ScannerArea = styled.div`
@@ -246,4 +275,5 @@ const DevButton = styled.button`
   border: none;
   font-weight: 800;
   font-size: 16px;
+  cursor: pointer;
 `;

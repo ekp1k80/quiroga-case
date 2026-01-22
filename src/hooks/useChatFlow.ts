@@ -1,12 +1,13 @@
+// src/hooks/useChatFlow.ts
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatConsoleMessage, ChatApiMessage } from "@/components/GameChatConsole";
-import type { PackFile } from "@/data/packs";
+import { useAssets } from "@/providers/AssetsProvider";
+import type { ApiPackFile } from "@/types/packApi";
 
 export type ChatChoice = { id: string; label: string };
 
-// ✅ lo que viene del backend
 export type BackendChatMessage =
   | string
   | { type: "packFile"; fileId: string; caption?: string };
@@ -20,6 +21,7 @@ export type ChatFlowResponse = {
 
   effects?: Record<string, any>;
   choices?: ChatChoice[];
+  advanced?: { from: string; to: string };
 
   error?: string;
 };
@@ -33,6 +35,9 @@ export type UseChatFlowOptions = {
   autoInit?: boolean;
 
   externallyDisabled?: boolean;
+
+  // clave de scope para resetear entre story-nodes (ej: user.storyNode)
+  scopeKey?: string;
 
   onDone?: (payload: {
     packId: string;
@@ -58,18 +63,56 @@ function makeSystemMsg(payload: ChatApiMessage): ChatConsoleMessage {
   return { id: crypto.randomUUID(), at: Date.now(), from: "system", text: payload };
 }
 
-function makePlayerMsg(payload: ChatApiMessage): ChatConsoleMessage {
-  return { id: crypto.randomUUID(), at: Date.now(), from: "player", text: payload };
-}
+/* ===================== Persistencia ===================== */
 
-type PackIndex = {
-  files: PackFile[];
-  byId: Map<string, PackFile>;
+type PersistedChatMsg = {
+  id: string;
+  at: number;
+  from: "system" | "player";
+  text: BackendChatMessage; // serializable
 };
 
-type CacheEntry = { objectUrl: string; contentType?: string };
+type PersistedChatState = {
+  v: 1;
+  done: boolean;
+  choices: ChatChoice[];
+  messages: PersistedChatMsg[];
+};
+
+type MemoryChatState = {
+  uiMessages: ChatConsoleMessage[]; // puede contener img con objectUrl
+  persistedMessages: PersistedChatMsg[];
+  choices: ChatChoice[];
+  done: boolean;
+};
+
+const memoryCache = new Map<string, MemoryChatState>();
+const initInflight = new Map<string, Promise<ChatFlowResponse>>();
+
+function loadLS(key: string): PersistedChatState | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as PersistedChatState;
+    if (!data || data.v !== 1) return null;
+    if (!Array.isArray(data.messages)) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function saveLS(key: string, data: PersistedChatState) {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
 
 export function useChatFlow(opts: UseChatFlowOptions) {
+  const assets = useAssets();
+
   const {
     packId,
     puzzleId,
@@ -77,113 +120,60 @@ export function useChatFlow(opts: UseChatFlowOptions) {
     typingDelayMs = 650,
     autoInit = true,
     externallyDisabled = false,
+    scopeKey = "global",
     onDone,
     onBlocked,
     onOk,
     onWrong,
   } = opts;
 
+  const cacheKey = useMemo(() => `${scopeKey}|${endpoint}|${packId}|${puzzleId}`, [
+    scopeKey,
+    endpoint,
+    packId,
+    puzzleId,
+  ]);
+
+  const storageKey = useMemo(() => `cq:chatflow:v1:${cacheKey}`, [cacheKey]);
+
   const [messages, setMessages] = useState<ChatConsoleMessage[]>([]);
   const [choices, setChoices] = useState<ChatChoice[]>([]);
-
   const [sending, setSending] = useState(false);
   const [systemTyping, setSystemTyping] = useState(false);
   const [done, setDone] = useState(false);
   const [loadingInit, setLoadingInit] = useState(false);
 
+  const [persistedMessages, setPersistedMessages] = useState<PersistedChatMsg[]>([]);
+
   const disabled = useMemo(() => externallyDisabled || done, [externallyDisabled, done]);
 
-  // ✅ pack cache
-  const packRef = useRef<PackIndex | null>(null);
-  const packInflightRef = useRef<Promise<PackIndex> | null>(null);
+  const loadingInitRef = useRef(false);
 
-  // ✅ file blob cache (by fileId)
-  const fileCacheRef = useRef<Map<string, CacheEntry>>(new Map());
-  const fileInflightRef = useRef<Map<string, Promise<void>>>(new Map());
+  const hydrationStateRef = useRef<{
+    cacheKey: string | null;
+    readyToPersist: boolean;
+  }>({ cacheKey: null, readyToPersist: false });
 
-  // cleanup object urls cuando cambia packId (o unmount)
-  useEffect(() => {
-    return () => {
-      for (const entry of fileCacheRef.current.values()) URL.revokeObjectURL(entry.objectUrl);
-      fileCacheRef.current.clear();
-      fileInflightRef.current.clear();
-      packRef.current = null;
-      packInflightRef.current = null;
-    };
-  }, [packId]);
-
-  const fetchPackIndex = useCallback(async (): Promise<PackIndex> => {
-    if (packRef.current) return packRef.current;
-    const inflight = packInflightRef.current;
-    if (inflight) return inflight;
-
-    const p = (async () => {
-      const res = await fetch(`/api/packs/${encodeURIComponent(packId)}`, { cache: "no-store" });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) throw new Error(data?.error ?? "Pack fetch failed");
-
-      const files: PackFile[] = data.files ?? [];
-      const byId = new Map<string, PackFile>();
-      for (const f of files) byId.set(f.id, f);
-
-      const idx = { files, byId };
-      packRef.current = idx;
-      return idx;
-    })().finally(() => {
-      packInflightRef.current = null;
-    });
-
-    packInflightRef.current = p;
-    return p;
-  }, [packId]);
-
-  const ensureFileCached = useCallback(async (file: PackFile) => {
-    if (fileCacheRef.current.has(file.id)) return;
-
-    const existing = fileInflightRef.current.get(file.id);
-    if (existing) return existing;
-
-    const p = (async () => {
-      const fileRes = await fetch(`/api/r2-proxy?key=${encodeURIComponent(file.key)}`, {
-        cache: "force-cache",
-      });
-      if (!fileRes.ok) return;
-
-      const blob = await fileRes.blob();
-      const objectUrl = URL.createObjectURL(blob);
-
-      fileCacheRef.current.set(file.id, {
-        objectUrl,
-        contentType: fileRes.headers.get("content-type") ?? undefined,
-      });
-    })().finally(() => {
-      fileInflightRef.current.delete(file.id);
-    });
-
-    fileInflightRef.current.set(file.id, p);
-    return p;
-  }, []);
+  /* ===================== Resolver backend -> UI ===================== */
 
   const resolveBackendMsgs = useCallback(
     async (backendMsgs: BackendChatMessage[]): Promise<ChatApiMessage[]> => {
-      // fast path
       if (!backendMsgs?.length) return [];
 
-      // si no hay packFile, devolvemos tal cual
       const hasPackFile = backendMsgs.some((m) => typeof m !== "string" && m?.type === "packFile");
       if (!hasPackFile) return backendMsgs as unknown as ChatApiMessage[];
 
-      let idx: PackIndex | null = null;
+      let files: ApiPackFile[] = [];
       try {
-        idx = await fetchPackIndex();
+        files = await assets.loadPack(packId);
       } catch {
-        // si falla pack, degradamos a texto
-        return backendMsgs.map((m) =>
-          typeof m === "string" ? m : `[Archivo: ${m.fileId}]`
-        );
+        return backendMsgs.map((m) => (typeof m === "string" ? m : `[Archivo: ${m.fileId}]`));
       }
 
+      const byId = new Map(files.map((f) => [f.id, f]));
+
       const out: ChatApiMessage[] = [];
+
       for (const m of backendMsgs) {
         if (typeof m === "string") {
           out.push(m);
@@ -191,30 +181,30 @@ export function useChatFlow(opts: UseChatFlowOptions) {
         }
 
         if (m.type === "packFile") {
-          const file = idx.byId.get(m.fileId);
-          if (!file) {
+          const f = byId.get(m.fileId);
+          if (!f) {
             out.push(`[Archivo: ${m.fileId}]`);
             continue;
           }
 
-          // solo inline si es img; doc/audio quedan como texto por ahora
-          if (file.type !== "img") {
-            out.push(file.title ?? `[Archivo: ${m.fileId}]`);
+          // inline solo img
+          if (f.type !== "img") {
+            out.push(f.title ?? `[Archivo: ${m.fileId}]`);
             continue;
           }
 
-          await ensureFileCached(file);
+          await assets.ensurePackFileCached(packId, f.id).catch(() => {});
+          const a = assets.getPackAsset(packId, f.id);
 
-          const cached = fileCacheRef.current.get(file.id);
-          if (!cached?.objectUrl) {
-            out.push(file.title ?? `[Imagen: ${m.fileId}]`);
+          if (!a?.src) {
+            out.push(f.title ?? `[Imagen: ${m.fileId}]`);
             continue;
           }
 
           out.push({
             type: "img",
-            src: cached.objectUrl,
-            alt: (file as any).alt ?? file.title ?? "",
+            src: a.src,
+            alt: (f as any).alt ?? f.title ?? "",
             caption: m.caption,
           });
           continue;
@@ -225,8 +215,10 @@ export function useChatFlow(opts: UseChatFlowOptions) {
 
       return out;
     },
-    [ensureFileCached, fetchPackIndex]
+    [assets, packId]
   );
+
+  /* ===================== API ===================== */
 
   const callApi = useCallback(
     async (input?: string) => {
@@ -247,40 +239,165 @@ export function useChatFlow(opts: UseChatFlowOptions) {
     [endpoint, packId, puzzleId]
   );
 
+  /* ===================== Hydration: memory -> localStorage ===================== */
+
+  useEffect(() => {
+    hydrationStateRef.current.cacheKey = cacheKey;
+    hydrationStateRef.current.readyToPersist = false;
+
+    // 1) memoria (tab switch)
+    const mem = memoryCache.get(cacheKey);
+    if (mem) {
+      setMessages(mem.uiMessages);
+      setPersistedMessages(mem.persistedMessages);
+      setChoices(mem.choices);
+      setDone(mem.done);
+      hydrationStateRef.current.readyToPersist = true;
+      return;
+    }
+
+    // 2) localStorage (reload)
+    const ls = loadLS(storageKey);
+    if (ls) {
+      setDone(!!ls.done);
+      setChoices(Array.isArray(ls.choices) ? ls.choices : []);
+      setPersistedMessages(Array.isArray(ls.messages) ? ls.messages : []);
+
+      (async () => {
+        const backendMsgs: BackendChatMessage[] = ls.messages.map((m) => m.text);
+        const resolved = await resolveBackendMsgs(backendMsgs);
+
+        const ui: ChatConsoleMessage[] = ls.messages.map((pm, i) => ({
+          id: pm.id ?? crypto.randomUUID(),
+          at: pm.at ?? Date.now() + i,
+          from: pm.from,
+          text: resolved[i] ?? "—",
+        }));
+
+        setMessages(ui);
+
+        memoryCache.set(cacheKey, {
+          uiMessages: ui,
+          persistedMessages: ls.messages,
+          choices: Array.isArray(ls.choices) ? ls.choices : [],
+          done: !!ls.done,
+        });
+
+        if (hydrationStateRef.current.cacheKey === cacheKey) {
+          hydrationStateRef.current.readyToPersist = true;
+        }
+      })();
+
+      return;
+    }
+
+    // 3) no hay nada guardado
+    hydrationStateRef.current.readyToPersist = true;
+  }, [cacheKey, storageKey, resolveBackendMsgs]);
+
+  /* ===================== Persist: memory + localStorage ===================== */
+
+  useEffect(() => {
+    if (hydrationStateRef.current.cacheKey !== cacheKey) return;
+    if (!hydrationStateRef.current.readyToPersist) return;
+
+    const hasAnything =
+      persistedMessages.length > 0 || messages.length > 0 || choices.length > 0 || done;
+
+    if (!hasAnything) return;
+
+    memoryCache.set(cacheKey, {
+      uiMessages: messages,
+      persistedMessages,
+      choices,
+      done,
+    });
+
+    saveLS(storageKey, {
+      v: 1,
+      done: !!done,
+      choices: Array.isArray(choices) ? choices : [],
+      messages: persistedMessages,
+    });
+  }, [cacheKey, storageKey, messages, persistedMessages, choices, done]);
+
+  /* ===================== init (dedupe) ===================== */
+
   const init = useCallback(async () => {
-    if (loadingInit) return;
+    if (loadingInitRef.current) return;
+    loadingInitRef.current = true;
     setLoadingInit(true);
 
     try {
-      const data = await callApi("");
+      const mem = memoryCache.get(cacheKey);
+      if (mem && (mem.persistedMessages.length > 0 || mem.done)) return;
+
+      const ls = loadLS(storageKey);
+      if (ls && ls.messages.length > 0) return;
+
+      let p = initInflight.get(cacheKey);
+      if (!p) {
+        p = callApi("");
+        initInflight.set(cacheKey, p);
+        p.finally(() => initInflight.delete(cacheKey));
+      }
+
+      const data = await p;
 
       setDone(!!data.done);
-      setMessages([]);
       setChoices(Array.isArray(data.choices) ? data.choices : []);
 
-      const resolved = await resolveBackendMsgs(Array.isArray(data.messages) ? data.messages : []);
+      const backend = Array.isArray(data.messages) ? data.messages : [];
+      const now = Date.now();
 
-      if (resolved.length) {
-        const now = Date.now();
-        setMessages(
-          resolved.map((m, i) => ({
-            id: crypto.randomUUID(),
-            at: now + i,
-            from: "system",
-            text: m,
-          }))
-        );
-      }
+      const sysPersisted: PersistedChatMsg[] = backend.map((m, i) => ({
+        id: crypto.randomUUID(),
+        at: now + i,
+        from: "system",
+        text: m,
+      }));
+
+      setPersistedMessages(sysPersisted);
+
+      const resolved = await resolveBackendMsgs(backend);
+
+      const ui: ChatConsoleMessage[] = resolved.map((m, i) => ({
+        id: sysPersisted[i]?.id ?? crypto.randomUUID(),
+        at: sysPersisted[i]?.at ?? now + i,
+        from: "system",
+        text: m,
+      }));
+
+      setMessages(ui);
+
+      hydrationStateRef.current.readyToPersist = true;
 
       if (data.blocked) onBlocked?.({ packId, puzzleId, response: data });
       if (data.done) onDone?.({ packId, puzzleId, response: data });
     } catch {
       setMessages([makeSystemMsg("Error cargando el chat. Intentá recargar.")]);
       setChoices([]);
+      setPersistedMessages([]);
     } finally {
       setLoadingInit(false);
+      loadingInitRef.current = false;
     }
-  }, [callApi, loadingInit, onBlocked, onDone, packId, puzzleId, resolveBackendMsgs]);
+  }, [cacheKey, storageKey, callApi, onBlocked, onDone, packId, puzzleId, resolveBackendMsgs]);
+
+  useEffect(() => {
+    if (!autoInit) return;
+
+    const mem = memoryCache.get(cacheKey);
+    if (mem && (mem.persistedMessages.length > 0 || mem.done)) return;
+
+    const ls = loadLS(storageKey);
+    if (ls && ls.messages.length > 0) return;
+
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoInit, cacheKey, storageKey]);
+
+  /* ===================== send ===================== */
 
   const send = useCallback(
     async (rawText: string, normalizedText?: string) => {
@@ -289,9 +406,20 @@ export function useChatFlow(opts: UseChatFlowOptions) {
       const normalized = normalizedText ?? normalizeInput(rawText);
       if (!normalized) return;
 
-      setMessages((prev) => [...prev, makePlayerMsg(rawText)]);
-      setChoices([]);
+      const playerPersisted: PersistedChatMsg = {
+        id: crypto.randomUUID(),
+        at: Date.now(),
+        from: "player",
+        text: rawText,
+      };
 
+      setPersistedMessages((prev) => [...prev, playerPersisted]);
+      setMessages((prev) => [
+        ...prev,
+        { id: playerPersisted.id, at: playerPersisted.at, from: "player", text: rawText },
+      ]);
+
+      setChoices([]);
       setSending(true);
       setSystemTyping(true);
 
@@ -310,17 +438,27 @@ export function useChatFlow(opts: UseChatFlowOptions) {
 
       setChoices(Array.isArray(data.choices) ? data.choices : []);
 
-      const resolved = await resolveBackendMsgs(Array.isArray(data.messages) ? data.messages : []);
+      const backend = Array.isArray(data.messages) ? data.messages : [];
+      const now = Date.now();
+
+      const sysPersisted: PersistedChatMsg[] = backend.map((m, i) => ({
+        id: crypto.randomUUID(),
+        at: now + i,
+        from: "system",
+        text: m,
+      }));
+
+      setPersistedMessages((prev) => [...prev, ...sysPersisted]);
+
+      const resolved = await resolveBackendMsgs(backend);
 
       if (resolved.length) {
-        const now = Date.now();
-        // @ts-ignore
         setMessages((prev) => [
           ...prev,
           ...resolved.map((m, i) => ({
-            id: crypto.randomUUID(),
-            at: now + i,
-            from: "system",
+            id: sysPersisted[i]?.id ?? crypto.randomUUID(),
+            at: sysPersisted[i]?.at ?? now + i,
+            from: "system" as const,
             text: m,
           })),
         ]);
@@ -356,14 +494,8 @@ export function useChatFlow(opts: UseChatFlowOptions) {
   );
 
   const refresh = useCallback(async () => {
-    await init();
-  }, [init]);
-
-  useEffect(() => {
-    if (!autoInit) return;
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [packId, puzzleId]);
+    // no-op
+  }, []);
 
   return {
     messages,
