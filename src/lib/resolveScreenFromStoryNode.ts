@@ -5,7 +5,8 @@ export type GameScreen =
   | { kind: "chat"; packId: string; puzzleId: string; title?: string; subtitle?: string }
   | { kind: "files"; packId: string; title?: string }
   | { kind: "qr"; title?: string }
-  | { kind: "storyteller"; sceneId: string };
+  | { kind: "storyteller"; sceneId: string }
+  | { kind: "final-puzzle"; storyNode: string };
 
 type ScreenResolve = {
   // pantalla principal (lo que se auto-muestra)
@@ -22,6 +23,14 @@ export function resolveScreenFromStoryNode(storyNode: StoryNode): ScreenResolve 
   // ✅ Base: una vez que el juego arrancó, querés poder ir a chat/files/qr
   // (los endpoints igual bloquean si no corresponde)
   const baseTabs: ScreenResolve["tabs"] = ["chat", "files", "qr"];
+
+  if (storyNode === "qr3") {
+    return {
+      primary: { kind: "final-puzzle", storyNode: "qr3" },
+      tabs: ["files"],
+      defaultTab: "files",
+    };
+  }
 
   // Storyteller scenes (ejemplos; agregás todos los que quieras)
   if (storyNode === "prologue-1") {

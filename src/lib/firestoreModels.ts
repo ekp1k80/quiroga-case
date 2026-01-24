@@ -2,6 +2,7 @@
 import { STORY_FLOW, StoryNode, storyReached } from "@/data/levels";
 import { db, FieldValue } from "./firebaseAdmin";
 import { ProgressPatch } from "@/data/puzzles/puzzleFlows";
+import { QR3_FINAL_QUIZ } from "@/data/final/qr3FinalQuiz";
 
 export type TemporalCodeDoc = {
   createdAt: FirebaseFirestore.FieldValue | FirebaseFirestore.Timestamp;
@@ -353,4 +354,332 @@ export async function markUserSubmissionCompleted(userId: string, packId: string
     },
     { merge: true }
   );
+}
+
+export type PlaySessionState = "open" | "locked" | "final";
+
+export type PlaySessionDoc = {
+  storyNode: string; // "qr3"
+  state: PlaySessionState;
+
+  createdAt: FirebaseFirestore.FieldValue | FirebaseFirestore.Timestamp;
+  updatedAt: FirebaseFirestore.FieldValue | FirebaseFirestore.Timestamp;
+
+  lockedAt?: FirebaseFirestore.FieldValue | FirebaseFirestore.Timestamp;
+
+  totalPlayers: number;
+  totalGroups: number;
+  doneGroups: number;
+
+  threshold: number;
+  totalQuestions: number;
+};
+
+export type PlaySessionPlayerDoc = {
+  userId: string;   // en debug: es el debugPlayerId
+  name: string;
+
+  joinedAt: FirebaseFirestore.FieldValue | FirebaseFirestore.Timestamp;
+
+  groupId?: string | null;
+  groupIndex?: number | null;
+};
+
+export type PlaySessionGroupDoc = {
+  index: number; // 1..G
+  state: "active" | "done";
+
+  memberUserIds: string[];
+
+  score?: number | null;
+
+  finishedAt?: FirebaseFirestore.FieldValue | FirebaseFirestore.Timestamp;
+  rank?: number | null;
+};
+
+function playSessionIdForNode(storyNode: string) {
+  return `final__${storyNode}`;
+}
+
+function groupDocId(index: number) {
+  return `g${String(index).padStart(2, "0")}`;
+}
+
+function computeGroupSizes(n: number): number[] {
+  // grupos de 3, y el "resto" (1 o 2) se agrega al ÚLTIMO grupo
+  // nunca grupo < 3
+  if (n < 3) return [];
+  const base = Math.floor(n / 3);
+  const rem = n % 3;
+
+  if (rem === 0) {
+    return Array.from({ length: base }, () => 3);
+  }
+
+  // rem 1 o 2: mantenemos base-1 grupos de 3, y el último se queda con 3+rem
+  // Ej:
+  // n=4 => base=1 rem=1 => [4]
+  // n=5 => [5]
+  // n=7 => base=2 rem=1 => [3,4]
+  // n=8 => [3,5]
+  // n=10 => [3,3,4]
+  // n=11 => [3,3,5]
+  if (base === 1) return [3 + rem];
+
+  const out: number[] = [];
+  for (let i = 0; i < base - 1; i++) out.push(3);
+  out.push(3 + rem);
+  return out;
+}
+
+export async function ensurePlaySession(storyNode: string) {
+  const sid = playSessionIdForNode(storyNode);
+  const ref = db().collection("playSessions").doc(sid);
+  const snap = await ref.get();
+
+  if (snap.exists) return { id: snap.id, ...(snap.data() as any) } as PlaySessionDoc & { id: string };
+
+  const now = FieldValue.serverTimestamp();
+  const doc: PlaySessionDoc = {
+    storyNode,
+    state: "open",
+    createdAt: now,
+    updatedAt: now,
+    totalPlayers: 0,
+    totalGroups: 0,
+    doneGroups: 0,
+    threshold: QR3_FINAL_QUIZ.threshold,
+    totalQuestions: QR3_FINAL_QUIZ.questions.length,
+  };
+
+  await ref.set(doc, { merge: true });
+  const created = await ref.get();
+  return { id: created.id, ...(created.data() as any) } as PlaySessionDoc & { id: string };
+}
+
+export async function joinPlaySessionDebug(opts: { storyNode: string; userId: string; name: string }) {
+  const { storyNode, userId, name } = opts;
+  const sid = playSessionIdForNode(storyNode);
+
+  const sessionRef = db().collection("playSessions").doc(sid);
+  const playerRef = sessionRef.collection("players").doc(userId);
+
+  await db().runTransaction(async (tx) => {
+    const sesSnap = await tx.get(sessionRef);
+    if (!sesSnap.exists) {
+      const now = FieldValue.serverTimestamp();
+      tx.set(
+        sessionRef,
+        {
+          storyNode,
+          state: "open",
+          createdAt: now,
+          updatedAt: now,
+          totalPlayers: 0,
+          totalGroups: 0,
+          doneGroups: 0,
+          threshold: QR3_FINAL_QUIZ.threshold,
+          totalQuestions: QR3_FINAL_QUIZ.questions.length,
+        } satisfies PlaySessionDoc,
+        { merge: true }
+      );
+    }
+
+    const ses = (sesSnap.exists ? (sesSnap.data() as any) : null) as PlaySessionDoc | null;
+    if (ses?.state && ses.state !== "open") {
+      // sesión cerrada: no entra nadie nuevo (regla)
+      throw new Error("La sesión ya comenzó (locked).");
+    }
+
+    const plSnap = await tx.get(playerRef);
+    if (plSnap.exists) {
+      // ya está unido: no duplicar
+      tx.set(sessionRef, { updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      return;
+    }
+
+    tx.set(
+      playerRef,
+      {
+        userId,
+        name: name?.trim() || "Jugador",
+        joinedAt: FieldValue.serverTimestamp(),
+        groupId: null,
+        groupIndex: null,
+      } satisfies PlaySessionPlayerDoc,
+      { merge: true }
+    );
+
+    tx.set(
+      sessionRef,
+      {
+        totalPlayers: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
+}
+
+export async function lockAndCreateGroupsIfReady(opts: { storyNode: string }) {
+  const { storyNode } = opts;
+  const sid = playSessionIdForNode(storyNode);
+
+  const sessionRef = db().collection("playSessions").doc(sid);
+  const playersCol = sessionRef.collection("players");
+  const groupsCol = sessionRef.collection("groups");
+
+  await db().runTransaction(async (tx) => {
+    const sesSnap = await tx.get(sessionRef);
+    if (!sesSnap.exists) return;
+    const ses = sesSnap.data() as any as PlaySessionDoc;
+
+    if (ses.state !== "open") return;
+
+    // Traemos jugadores dentro de la tx (limitado pero ok para debug)
+    const playersSnap = await tx.get(playersCol);
+    const players = playersSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as Array<
+      PlaySessionPlayerDoc & { id: string }
+    >;
+
+    const n = players.length;
+    if (n < 3) return;
+
+    // ✅ lock: ya no entra nadie, y creamos grupos YA (sin pausa)
+    const sizes = computeGroupSizes(n);
+    if (!sizes.length) return;
+
+    // ordenar por joinedAt (si falta resolved timestamp, por id)
+    players.sort((a, b) => {
+      const am = (a.joinedAt as any)?.toMillis?.() ?? 0;
+      const bm = (b.joinedAt as any)?.toMillis?.() ?? 0;
+      if (am !== bm) return am - bm;
+      return a.id.localeCompare(b.id);
+    });
+
+    let cursor = 0;
+    const groupIds: string[] = [];
+
+    for (let i = 0; i < sizes.length; i++) {
+      const groupIndex = i + 1;
+      const size = sizes[i];
+      const slice = players.slice(cursor, cursor + size);
+      cursor += size;
+
+      const gid = groupDocId(groupIndex);
+      groupIds.push(gid);
+
+      tx.set(
+        groupsCol.doc(gid),
+        {
+          index: groupIndex,
+          state: "active",
+          memberUserIds: slice.map((p) => p.userId),
+          score: null,
+          finishedAt: null,
+          rank: null,
+        } satisfies PlaySessionGroupDoc,
+        { merge: true }
+      );
+
+      for (const p of slice) {
+        tx.set(
+          playersCol.doc(p.userId),
+          { groupId: gid, groupIndex },
+          { merge: true }
+        );
+      }
+    }
+
+    tx.set(
+      sessionRef,
+      {
+        state: "locked",
+        lockedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        totalPlayers: n,
+        totalGroups: sizes.length,
+        doneGroups: 0,
+        threshold: QR3_FINAL_QUIZ.threshold,
+        totalQuestions: QR3_FINAL_QUIZ.questions.length,
+      },
+      { merge: true }
+    );
+  });
+}
+
+export async function getFinalPlaySessionState(storyNode: string) {
+  const sid = playSessionIdForNode(storyNode);
+  const sessionRef = db().collection("playSessions").doc(sid);
+
+  const sesSnap = await sessionRef.get();
+  if (!sesSnap.exists) return null;
+
+  const [playersSnap, groupsSnap] = await Promise.all([
+    sessionRef.collection("players").get(),
+    sessionRef.collection("groups").get(),
+  ]);
+
+  const session = { id: sesSnap.id, ...(sesSnap.data() as any) } as PlaySessionDoc & { id: string };
+
+  const players = playersSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as Array<
+    PlaySessionPlayerDoc & { id: string }
+  >;
+
+  const groups = groupsSnap.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as Array<
+    PlaySessionGroupDoc & { id: string }
+  >;
+
+  // orden estable
+  groups.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+  return { session, players, groups };
+}
+
+export async function markFinalGroupDone(opts: { storyNode: string; groupId: string; score: number }) {
+  const { storyNode, groupId, score } = opts;
+  const sid = playSessionIdForNode(storyNode);
+
+  const sessionRef = db().collection("playSessions").doc(sid);
+  const groupRef = sessionRef.collection("groups").doc(groupId);
+
+  await db().runTransaction(async (tx) => {
+    const sesSnap = await tx.get(sessionRef);
+    if (!sesSnap.exists) throw new Error("Session missing");
+    const ses = sesSnap.data() as any as PlaySessionDoc;
+
+    const gSnap = await tx.get(groupRef);
+    if (!gSnap.exists) throw new Error("Group missing");
+    const g = gSnap.data() as any as PlaySessionGroupDoc;
+
+    if (g.state === "done") return;
+
+    // rank = doneGroups + 1
+    const nextRank = (ses.doneGroups ?? 0) + 1;
+
+    tx.set(
+      groupRef,
+      {
+        state: "done",
+        score,
+        finishedAt: FieldValue.serverTimestamp(),
+        rank: nextRank,
+      },
+      { merge: true }
+    );
+
+    const newDone = nextRank;
+    const total = ses.totalGroups ?? 0;
+    const isFinal = total > 0 && newDone >= total;
+
+    tx.set(
+      sessionRef,
+      {
+        doneGroups: newDone,
+        updatedAt: FieldValue.serverTimestamp(),
+        ...(isFinal ? { state: "final" as const } : {}),
+      },
+      { merge: true }
+    );
+  });
 }

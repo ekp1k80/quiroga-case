@@ -20,6 +20,7 @@ import type { GameScreen } from "@/lib/resolveScreenFromStoryNode";
 import CharacterCreation from "./CharacterCreation";
 import FullScreenLoader from "./FullScreenLoader";
 import { EffectsList } from "@/types/effects";
+import FinalPuzzleOrchestrator from "./final/FinalPuzzleOrchestrator";
 
 type Tab = "chat" | "files" | "qr";
 
@@ -80,6 +81,13 @@ export default function GameOrchestrator() {
             const data = await notifyStorytellerSeen(screen.sceneId);
             if (data.ok && data.advanced) await applyAdvanced(data.advanced);
             if (data.ok && (data as any).effects?.length) await applyEffects((data as any).effects);
+          }}
+        />
+      ) : screen.kind === "final-puzzle" ? (
+        <FinalPuzzleOrchestrator
+          user={user}
+          onAdvanced={async (adv) => {
+            await applyAdvanced({ from: adv.from, to: adv.to });
           }}
         />
       ) : (
