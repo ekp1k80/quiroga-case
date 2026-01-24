@@ -105,10 +105,10 @@ export const CHAT_QR1_CHAT_FLOW: PuzzleFlow = {
             "El: Si, justo, justo. A vos sola se te ocurre que es mejor un colegio de capital viviendo en San Justo",
             "Ella: Es que estaba lindo",
             "El: Si la verdad que si...",
-            "El: Che Kira se esta quedando sin comida... Tendriamos que comprar",
+            "El: Che Nala se esta quedando sin comida... Tendriamos que comprar",
             "Ella: Tranqui ya encargue ayer",
-            "El: La verdad que Kira sola no gastaba tanto como el crio - Se rie",
-            "Ella: Amor, Kira nos cagaba en todo el departamento, a parte ya puede ir al baño sin ayuda y encima se re parece a vos",
+            "El: La verdad que Nala sola no gastaba tanto como el crio - Se rie",
+            "Ella: Amor, Nala nos cagaba en todo el departamento, a parte ya puede ir al baño sin ayuda y encima se re parece a vos",
             "Ella: Es re hermoso <3"
           ],
           advance: true,

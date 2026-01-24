@@ -2,14 +2,14 @@
 import { type PuzzleFlow } from "@/data/puzzles/puzzleFlows";
 
 export const QR3_EDUARDO_HOUSE_NEXT_CHAT_FLOW: PuzzleFlow = {
-  packId: "qr3",
+  packId: "eduardo-house-next-chat",
   puzzleId: "eduardo-house-next-chat",
 
   // deps: ['eduardo-house-chat'] (y vos después lo vas a condicionar a "vio el board")
-  requires: { type: "story", node: "eduardo-house-chat" },
+  requires: { type: "story", node: "eduardo-house-board-chat" },
 
   // No invento storyNode siguiente (orquestador después)
-  onSuccess: { addFlags: ["eduardo-house-next-chat-completed"] },
+  onSuccess: { storyNode: "casa-maria-cordoba" },
 
   blockedMessage: "Todavía no podés continuar desde acá.",
   steps: [

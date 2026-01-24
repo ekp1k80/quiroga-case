@@ -6,8 +6,8 @@ function nonEmpty(s: string) {
 }
 
 export const QR2_FLOW: PuzzleFlow = {
-  packId: "qr2",
-  puzzleId: "qr2",
+  packId: "qr2-puzzle",
+  puzzleId: "qr2-puzzle",
 
   // Antes: requiredLevel: 1
   // Si querés que SIEMPRE esté accesible, podés directamente omitir `requires`.
@@ -15,12 +15,38 @@ export const QR2_FLOW: PuzzleFlow = {
 
   // Antes: successLevel: 1
   // Si no avanza historia, dejalo vacío o usá flags/tags.
-  onSuccess: { addFlags: ["qr2-completed"], storyNode: "before-scan-qr2-chat" },
+  onSuccess: { addFlags: ["qr2-completed"], storyNode: "eduardo-house-chat" },
 
   blockedMessage: "Todavía no podés completar este QR.",
   steps: [
     {
-      prompt: "QR2 — I. DATOS DEL HECHO\nFecha del hecho denunciado:",
+      prompt: [
+        "Bueno, es momento de revisar todo lo que tenemos, vuelve aqui cuanto estes lindo digo listo..."
+      ],
+      choices: [
+        { id: "ready", label: "Estoy listo" },
+        { id: "whatIsReady", label: "Que es estar listo?" },
+      ],
+      choiceReplies: {
+        ready: {
+          messages: [
+            "Okay, continuemos... Tenemos que rellenar la informacion",
+          ],
+          advance: true,
+        },
+        whatIsReady: {
+          messages: [
+            "Capo o capa, podes leer los archivos por favor...",
+          ],
+          advance: true,
+        },
+      },
+      check: () => true,
+      okMessages: [],
+      badMessages: ["Elegí una opción."],
+    },
+    {
+      prompt: "I. DATOS DEL HECHO\nFecha del hecho denunciado:",
       check: nonEmpty,
       okMessages: ["Ok. Anotado."],
       badMessages: ["Escribí una fecha (aunque sea aproximada)."],

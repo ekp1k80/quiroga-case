@@ -2,14 +2,14 @@
 import { type PuzzleFlow } from "@/data/puzzles/puzzleFlows";
 
 export const QR3_EDUARDO_HOUSE_CHAT_FLOW: PuzzleFlow = {
-  packId: "qr3",
+  packId: "eduardo-house-chat",
   puzzleId: "eduardo-house-chat",
 
   // deps: ['qr2']
-  requires: { type: "story", node: "qr2" },
+  requires: { type: "story", node: "qr2-puzzle" },
 
   // ✅ Fin Chat 1 → storyNode = "eduardo-house-board"
-  onSuccess: { storyNode: "eduardo-house-board" },
+  onSuccess: { storyNode: "eduardo-house-board-chat" },
 
   blockedMessage: "Todavía no podés acceder a esta secuencia.",
   steps: [

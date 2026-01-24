@@ -20,9 +20,10 @@ export const STORY_FLOW = [
   { name: 'qr2-chat', deps: ['before-scan-qr2-chat'] }, // chat to unlock Sofia files
   { name: 'qr2-puzzle', deps: ['qr2-chat'] }, // all the file of the Sofia case are unlocked
   { name: 'eduardo-house-chat', deps: ['qr2-puzzle'] }, // story telling of arrive to Eduardo's house
-  { name: 'eduardo-house-board', deps: ['eduardo-house-chat'] }, // all the file of the Eduardo's house board are available
-  { name: 'eduardo-house-next-chat', deps: ['eduardo-house-chat'] }, // after user see all the board files they are able to continue to Maria Cordoba house
-  { name: 'casa-maria-cordoba', deps: ['eduardo-house-chat'] }, // able to watch maria cordoba
+  { name: 'eduardo-house-board-chat', deps: ['eduardo-house-chat'] }, // all the file of the Eduardo's house board are available
+  { name: 'eduardo-house-next-chat', deps: ['eduardo-house-board-chat'] }, // after user see all the board files they are able to continue to Maria Cordoba house
+  { name: 'after-casa-eduardo', deps: ['eduardo-house-next-chat'] }, // able to watch maria cordoba
+  { name: 'casa-maria-cordoba', deps: ['after-casa-eduardo'] }, // able to watch maria cordoba
   { name: 'recapitulacion-maria', deps: ['casa-maria-cordoba'] }, // able to watch recapitulacion maria cordoba
   { name: 'llegada-casa-beatriz', deps: ['recapitulacion-maria'] }, // able to watch llegada a la casa de beatriz
   { name: 'beatriz-abre-puerta', deps: ['llegada-casa-beatriz'] }, // able to watch beatriz abre la puerta
