@@ -8,22 +8,15 @@ import { Html5Qrcode } from "html5-qrcode";
 type Props = {
   onCode: (code: string) => void | Promise<void>;
   onClose?: () => void;
-
-  /**
-   * Si true, para la cámara después de que onCode resuelve sin tirar error.
-   * Default true.
-   */
   stopOnSuccess?: boolean;
-
-  /**
-   * Cooldown entre lecturas (ms). Default 900.
-   */
   cooldownMs?: number;
+  devSimulate?: boolean;
 
   /**
-   * Para dev: permite simular código (solo en NODE_ENV !== "production").
+   * Si true: para esta sesión, un mismo QR solo dispara 1 vez (aunque vuelvas a apuntarlo).
+   * Default false (solo dedupe por cooldown + lastCode).
    */
-  devSimulate?: boolean;
+  oncePerCode?: boolean;
 };
 
 export default function QrScanner({
@@ -32,8 +25,8 @@ export default function QrScanner({
   stopOnSuccess = true,
   cooldownMs = 900,
   devSimulate = true,
+  oncePerCode = false,
 }: Props) {
-  /* ================= SSR-safe ID ================= */
   const reactId = useId();
   const readerId = `qr-reader-${reactId}`;
 
@@ -43,13 +36,14 @@ export default function QrScanner({
     "starting"
   );
 
-  const [lastCode, setLastCode] = useState<string | null>(null);
-  const [cooldown, setCooldown] = useState(false);
-
   const isDev = process.env.NODE_ENV !== "production";
   const [debugCode, setDebugCode] = useState("");
 
-  /* ================= Camera ================= */
+  // ✅ refs para evitar closures viejas
+  const cooldownUntilRef = useRef<number>(0);
+  const lastCodeRef = useRef<string | null>(null);
+  const processingRef = useRef<boolean>(false);
+  const seenRef = useRef<Set<string>>(new Set());
 
   const stopCamera = async () => {
     try {
@@ -63,8 +57,46 @@ export default function QrScanner({
     }
   };
 
+  const handleDecoded = async (decodedText: string) => {
+    const now = Date.now();
+    if (processingRef.current) return;
+    if (now < cooldownUntilRef.current) return;
+
+    const code = decodedText?.trim();
+    if (!code) return;
+
+    // dedupe inmediato
+    if (code === lastCodeRef.current) return;
+
+    // dedupe fuerte opcional (una vez por código por sesión)
+    if (oncePerCode && seenRef.current.has(code)) return;
+
+    // lock
+    processingRef.current = true;
+    cooldownUntilRef.current = now + cooldownMs;
+    lastCodeRef.current = code;
+    if (oncePerCode) seenRef.current.add(code);
+
+    setStatus("processing");
+
+    try {
+      await onCode(code);
+      setStatus("done");
+      if (stopOnSuccess) {
+        await stopCamera();
+      } else {
+        setStatus("scanning");
+      }
+    } catch {
+      // si falla, permitimos reintentar después del cooldown
+      setStatus("scanning");
+    } finally {
+      // soltamos lock (pero cooldown sigue por tiempo)
+      processingRef.current = false;
+    }
+  };
+
   useEffect(() => {
-    // en dev podés usar simulación (si querés igual arrancar cámara en dev, poné devSimulate=false)
     if (isDev && devSimulate) return;
 
     let cancelled = false;
@@ -76,80 +108,35 @@ export default function QrScanner({
 
         const config = { fps: 12, qrbox: { width: 240, height: 240 } };
 
-        // 1) Intento principal: pedir cámara trasera por facingMode
+        // Back cam preferida
         try {
           await inst.start(
             { facingMode: "environment" },
             config,
             async (decodedText) => {
-              if (cancelled || cooldown) return;
-
-              const code = decodedText?.trim();
-              if (!code) return;
-              if (code === lastCode) return;
-
-              setCooldown(true);
-              setTimeout(() => setCooldown(false), cooldownMs);
-
-              setLastCode(code);
-              setStatus("processing");
-
-              try {
-                await onCode(code);
-                if (cancelled) return;
-
-                setStatus("done");
-                if (stopOnSuccess) await stopCamera();
-                else setStatus("scanning");
-              } catch {
-                if (cancelled) return;
-                setStatus("scanning");
-              }
+              if (cancelled) return;
+              await handleDecoded(decodedText);
             },
             () => {}
           );
-
           if (!cancelled) setStatus("scanning");
           return;
         } catch {
-          // si falla el facingMode (algunos browsers raros), caemos a enumeración
+          // fallback
         }
 
-        // 2) Fallback: elegir “la más trasera” por label (cuando está disponible)
         const devices = await Html5Qrcode.getCameras();
         if (!devices?.length) throw new Error("No camera");
 
         const pickBack =
-          devices.find((d) => /back|rear|environment/i.test(d.label || "")) ??
-          devices[devices.length - 1]; // último suele ser trasera en Android
+          devices.find((d) => /back|rear|environment/i.test(d.label || "")) ?? devices[devices.length - 1];
 
         await inst.start(
           pickBack.id,
           config,
           async (decodedText) => {
-            if (cancelled || cooldown) return;
-
-            const code = decodedText?.trim();
-            if (!code) return;
-            if (code === lastCode) return;
-
-            setCooldown(true);
-            setTimeout(() => setCooldown(false), cooldownMs);
-
-            setLastCode(code);
-            setStatus("processing");
-
-            try {
-              await onCode(code);
-              if (cancelled) return;
-
-              setStatus("done");
-              if (stopOnSuccess) await stopCamera();
-              else setStatus("scanning");
-            } catch {
-              if (cancelled) return;
-              setStatus("scanning");
-            }
+            if (cancelled) return;
+            await handleDecoded(decodedText);
           },
           () => {}
         );
@@ -160,7 +147,6 @@ export default function QrScanner({
       }
     }
 
-
     start();
 
     return () => {
@@ -170,21 +156,11 @@ export default function QrScanner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ================= DEV simulate ================= */
-
+  // DEV simulate (también con lock)
   const simulate = async () => {
     if (!debugCode) return;
-    console.log("test")
-    setStatus("processing");
-    try {
-      await onCode(debugCode.trim());
-      setStatus("done");
-    } catch {
-      setStatus("scanning");
-    }
+    await handleDecoded(debugCode);
   };
-
-  /* ================= Render ================= */
 
   return (
     <Wrap>
@@ -197,11 +173,7 @@ export default function QrScanner({
       <ScannerArea>
         {isDev && devSimulate ? (
           <DevBox>
-            <DevInput
-              value={debugCode}
-              onChange={(e) => setDebugCode(e.target.value)}
-              placeholder="QR CODE"
-            />
+            <DevInput value={debugCode} onChange={(e) => setDebugCode(e.target.value)} placeholder="QR CODE" />
             <DevButton onClick={simulate}>Simular</DevButton>
           </DevBox>
         ) : (
@@ -218,8 +190,7 @@ export default function QrScanner({
   );
 }
 
-/* ================= styles ================= */
-
+/* styles igual que los tuyos */
 const Wrap = styled.div`
   position: relative;
   width: 100%;
