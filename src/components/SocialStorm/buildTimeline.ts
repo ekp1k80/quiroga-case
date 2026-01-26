@@ -31,6 +31,7 @@ function pushSpawn(events: SocialEvent[], i: number, t: number, sp: SeedPost, r:
       timeLabel: early ? "ahora" : r() < 0.33 ? "hace 1 min" : r() < 0.66 ? "hace 2 min" : "hace 3 min",
       ...lay,
       z: 10 + i,
+      kind: "tweet"
     },
   });
 }

@@ -38,8 +38,8 @@ export default function LlegadaCasaBeatrizScene({ onDone, audio }: Props) {
       {scene === "mainAudio" && (
         <ViewportWrapper fixedTime="13:10" showStatusBar>
           <AudioPlayer
-            src={audio.src}
-            blob={audio.blob}
+            src={audio?.src as string}
+            blob={audio?.blob as Blob}
             title={" "}
             viz={viz}
             showControls={false}

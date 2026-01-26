@@ -67,8 +67,8 @@ export default function ViajeCentragoloScene({ onDone, viaje, hospital }: Props)
 
             {(scene === "viaje-audio" || scene === "audio-only") && (
               <AudioPlayer
-                src={viaje.src}
-                blob={viaje.blob}
+                src={viaje?.src as string}
+                blob={viaje?.blob as Blob}
                 title={" "}
                 viz={viz}
                 showControls={false}
@@ -90,8 +90,8 @@ export default function ViajeCentragoloScene({ onDone, viaje, hospital }: Props)
       {scene === "mainAudio" && (
         <ViewportWrapper fixedTime="09:30" showStatusBar>
           <AudioPlayer
-            src={hospital.src}
-            blob={hospital.blob}
+            src={hospital?.src as string}
+            blob={hospital?.blob as Blob}
             title={" "}
             viz={viz}
             showControls={false}

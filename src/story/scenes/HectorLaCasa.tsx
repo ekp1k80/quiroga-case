@@ -38,8 +38,8 @@ export default function HectorLaCasaScene({ onDone, audio }: Props) {
       {scene === "mainAudio" && (
         <ViewportWrapper fixedTime="10:12" showStatusBar>
           <AudioPlayer
-            src={audio.src}
-            blob={audio.blob}
+            src={audio?.src as string}
+            blob={audio?.blob as Blob}
             title={" "}
             viz={viz}
             showControls={false}

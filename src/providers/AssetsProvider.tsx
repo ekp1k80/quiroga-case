@@ -67,7 +67,7 @@ export function AssetsProvider({ children }: { children: React.ReactNode }) {
 
     const m = await prefetchPublicAssets(paths);
     for (const [path, asset] of Object.entries(m)) {
-      publicAssetsRef.current.set(path, asset);
+      publicAssetsRef.current.set(path, asset as Asset);
     }
     setCacheVersion((v) => v + 1);
   }, []);

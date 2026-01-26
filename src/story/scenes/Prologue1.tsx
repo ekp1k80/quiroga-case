@@ -34,8 +34,8 @@ export default function PrologueScene({ onDone, audio }: Props) {
       {scene === "mainAudio" && (
         <ViewportWrapper fixedTime="15:30" showStatusBar>
           <AudioPlayer
-            src={audio.src}
-            blob={audio.blob}
+            src={audio?.src as string}
+            blob={audio?.blob as Blob}
             title={" "}
             viz={viz}
             showControls={false}

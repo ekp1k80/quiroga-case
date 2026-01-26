@@ -1,3 +1,4 @@
+"use client"
 import GameOrchestrator from "@/components/GameOrchestrator";
 import { AssetsProvider } from "@/providers/AssetsProvider";
 

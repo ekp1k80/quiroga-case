@@ -7,6 +7,7 @@ import { usePackPrefetch } from "@/hooks/usePackPrefetch";
 import type { PackFile } from "@/data/packs";
 import AudioPlayer from "@/components/AudioPlayer";
 import type { AudioVizConfig } from "@/data/packs";
+import { ApiPackFile } from "@/types/packApi";
 
 type Props = {
   packId: string;
@@ -142,7 +143,7 @@ export default function GamePackFilesViewer({
     setDrawerOpen(false);
 
     // trae file al cache
-    await ensureCached(f);
+    await ensureCached(f as unknown as (string | ApiPackFile));
 
     // marcamos como visto (una vez que intentamos abrirlo)
     markSeen(f.id);
@@ -162,7 +163,7 @@ export default function GamePackFilesViewer({
   // al cambiar selección por efecto, cache + visto
   useEffect(() => {
     if (!selected) return;
-    if (isLocked(selected)) return;
+    if (isLocked(selected as unknown as PackFile)) return;
     ensureCached(selected);
     markSeen(selected.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,14 +176,14 @@ export default function GamePackFilesViewer({
     if (!selected) return null;
     const url = selectedObjectUrl;
     if (!url) return null;
-    return isPdf(selected) ? withPdfViewerHints(url) : url;
+    return isPdf(selected as unknown as PackFile) ? withPdfViewerHints(url) : url;
   }, [selected, selectedObjectUrl]);
 
   // ✅ all seen: si todos los files del pack están en vistos, disparamos 1 vez.
   const allSeen = useMemo(() => {
     if (!selectableFiles.length) return false;
     // ignoramos locked en el conteo, por si el pack trae cosas “futuras”
-    const unlocked = selectableFiles.filter((f) => !isLocked(f));
+    const unlocked = selectableFiles.filter((f) => !isLocked(f as unknown as PackFile));
     if (!unlocked.length) return false;
     return unlocked.every((f) => seenIds.has(f.id));
   }, [selectableFiles, seenIds]);
@@ -192,7 +193,7 @@ export default function GamePackFilesViewer({
     if (allSeenTriggeredRef.current) return;
     allSeenTriggeredRef.current = true;
 
-    const unlockedIds = selectableFiles.filter((f) => !isLocked(f)).map((f) => f.id);
+    const unlockedIds = selectableFiles.filter((f) => !isLocked(f as unknown as PackFile)).map((f) => f.id);
     onAllSeen?.({ packId, fileIds: unlockedIds });
 
     if (!notifyBackendOnAllSeen) return;
@@ -223,7 +224,7 @@ export default function GamePackFilesViewer({
           </TopTitle>
         </TopLeft>
         <TopRight>
-          {selected ? <TopSelected>{displayName(selected)}</TopSelected> : <TopSelected>—</TopSelected>}
+          {selected ? <TopSelected>{displayName(selected as unknown as PackFile)}</TopSelected> : <TopSelected>—</TopSelected>}
         </TopRight>
       </TopBar>
 
@@ -243,24 +244,24 @@ export default function GamePackFilesViewer({
           {!loading &&
             selectableFiles.filter(f => !f.notShowFileViewer).map((f) => {
               const active = f.id === selectedId;
-              const locked = isLocked(f);
+              const locked = isLocked(f as unknown as PackFile);
               const seen = seenIds.has(f.id);
 
-              const icon = locked ? "🔒" : isPdf(f) ? "📄" : isAudio(f) ? "🎧" : isImg(f) ? "🖼️" : "📁";
+              const icon = locked ? "🔒" : isPdf(f as unknown as PackFile) ? "📄" : isAudio(f as unknown as PackFile) ? "🎧" : isImg(f as unknown as PackFile) ? "🖼️" : "📁";
 
               return (
-                <Row key={f.id} $active={active} $locked={locked} $seen={seen} onClick={() => selectFile(f)}>
-                  <IconBadge $kind={isPdf(f) ? "pdf" : isAudio(f) ? "audio" : "img"} $locked={locked}>
+                <Row key={f.id} $active={active} $locked={locked} $seen={seen} onClick={() => selectFile(f as unknown as PackFile)}>
+                  <IconBadge $kind={isPdf(f as unknown as PackFile) ? "pdf" : isAudio(f as unknown as PackFile) ? "audio" : "img"} $locked={locked}>
                     {icon}
                   </IconBadge>
 
                   <RowMain>
-                    <RowName title={displayName(f)}>
-                      {displayName(f)} {seen && !locked ? <SeenTick aria-label="Visto">✓</SeenTick> : null}
+                    <RowName title={displayName(f as unknown as PackFile)}>
+                      {displayName(f as unknown as PackFile)} {seen && !locked ? <SeenTick aria-label="Visto">✓</SeenTick> : null}
                     </RowName>
                     <RowMeta>
-                      <span>{kindLabel(f)}</span>
-                      <span>{displayDate(f) || " "}</span>
+                      <span>{kindLabel(f as unknown as PackFile)}</span>
+                      <span>{displayDate(f as unknown as PackFile) || " "}</span>
                     </RowMeta>
                   </RowMain>
 
@@ -288,24 +289,24 @@ export default function GamePackFilesViewer({
           {!loading &&
             selectableFiles.map((f) => {
               const active = f.id === selectedId;
-              const locked = isLocked(f);
+              const locked = isLocked(f as unknown as PackFile);
               const seen = seenIds.has(f.id);
 
-              const icon = locked ? "🔒" : isPdf(f) ? "📄" : isAudio(f) ? "🎧" : isImg(f) ? "🖼️" : "📁";
+              const icon = locked ? "🔒" : isPdf(f as unknown as PackFile) ? "📄" : isAudio(f as unknown as PackFile) ? "🎧" : isImg(f as unknown as PackFile) ? "🖼️" : "📁";
 
               return (
-                <Row key={f.id} $active={active} $locked={locked} $seen={seen} onClick={() => selectFile(f)}>
-                  <IconBadge $kind={isPdf(f) ? "pdf" : isAudio(f) ? "audio" : "img"} $locked={locked}>
+                <Row key={f.id} $active={active} $locked={locked} $seen={seen} onClick={() => selectFile(f as unknown as PackFile)}>
+                  <IconBadge $kind={isPdf(f as unknown as PackFile) ? "pdf" : isAudio(f as unknown as PackFile) ? "audio" : "img"} $locked={locked}>
                     {icon}
                   </IconBadge>
 
                   <RowMain>
-                    <RowName title={displayName(f)}>
-                      {displayName(f)} {seen && !locked ? <SeenTick aria-label="Visto">✓</SeenTick> : null}
+                    <RowName title={displayName(f as unknown as PackFile)}>
+                      {displayName(f as unknown as PackFile)} {seen && !locked ? <SeenTick aria-label="Visto">✓</SeenTick> : null}
                     </RowName>
                     <RowMeta>
-                      <span>{kindLabel(f)}</span>
-                      <span>{displayDate(f) || " "}</span>
+                      <span>{kindLabel(f as unknown as PackFile)}</span>
+                      <span>{displayDate(f as unknown as PackFile) || " "}</span>
                     </RowMeta>
                   </RowMain>
 
@@ -327,15 +328,15 @@ export default function GamePackFilesViewer({
             <EmptyTitle>Sin selección</EmptyTitle>
             <EmptyText>Elegí un archivo para visualizar.</EmptyText>
           </EmptyState>
-        ) : isLocked(selected) ? (
+        ) : isLocked(selected as unknown as PackFile) ? (
           <EmptyState>
             <EmptyTitle>Bloqueado</EmptyTitle>
             <EmptyText>Se desbloquea más adelante.</EmptyText>
           </EmptyState>
-        ) : isPdf(selected) ? (
+        ) : isPdf(selected as unknown as PackFile) ? (
           <Pane>
             <PaneHeader>
-              <PaneTitle>{displayName(selected)}</PaneTitle>
+              <PaneTitle>{displayName(selected as unknown as PackFile)}</PaneTitle>
               <PaneActions>
                 {viewerUrl && (
                   <ActionLink href={viewerUrl} target="_blank" rel="noreferrer">
@@ -347,7 +348,7 @@ export default function GamePackFilesViewer({
 
             <PdfWrap>
               {viewerUrl ? (
-                <PdfObject data={viewerUrl} type="application/pdf" aria-label={displayName(selected)}>
+                <PdfObject data={viewerUrl} type="application/pdf" aria-label={displayName(selected as unknown as PackFile)}>
                   <FallbackBox>
                     <div>Tu navegador no puede embeber PDFs.</div>
                     <a href={viewerUrl} target="_blank" rel="noreferrer">
@@ -360,10 +361,10 @@ export default function GamePackFilesViewer({
               )}
             </PdfWrap>
           </Pane>
-        ) : isImg(selected) ? (
+        ) : isImg(selected as unknown as PackFile) ? (
           <Pane>
             <PaneHeader>
-              <PaneTitle>{displayName(selected)}</PaneTitle>
+              <PaneTitle>{displayName(selected as unknown as PackFile)}</PaneTitle>
               <PaneActions>
                 {viewerUrl && (
                   <ActionLink href={viewerUrl} target="_blank" rel="noreferrer">
@@ -377,7 +378,7 @@ export default function GamePackFilesViewer({
               {viewerUrl ? (
                 <Img
                   src={viewerUrl}
-                  alt={(selected as any).alt ?? displayName(selected)}
+                  alt={(selected as any).alt ?? displayName(selected as unknown as PackFile)}
                   draggable={false}
                 />
               ) : (
@@ -388,7 +389,7 @@ export default function GamePackFilesViewer({
         ) : (
           <Pane>
             <PaneHeader>
-              <PaneTitle>{displayName(selected)}</PaneTitle>
+              <PaneTitle>{displayName(selected as unknown as PackFile)}</PaneTitle>
               <PaneActions>
                 {viewerUrl && (
                   <ActionLink href={viewerUrl} target="_blank" rel="noreferrer">
@@ -402,7 +403,7 @@ export default function GamePackFilesViewer({
               <AudioPlayer
                 src={viewerUrl as string}
                 blob={selectedBlob as Blob}
-                title={(selected as any).title ?? displayName(selected)}
+                title={(selected as any).title ?? displayName(selected as unknown as PackFile)}
                 viz={((selected as any).viz ?? undefined) as AudioVizConfig}
               />
             </AudioWrap>

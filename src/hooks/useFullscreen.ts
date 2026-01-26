@@ -2,6 +2,7 @@
 
 export function useFullscreen() {
   const enter = async (el?: HTMLElement) => {
+    if (typeof document === "undefined") return false; // SSR-safe
     try {
       const target = el ?? document.documentElement;
 
@@ -24,6 +25,7 @@ export function useFullscreen() {
   };
 
   const exit = async () => {
+    if (typeof document === "undefined") return false; // SSR-safe
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
@@ -41,7 +43,7 @@ export function useFullscreen() {
   };
 
   const isFullscreen = () => {
-    
+    if (typeof document === "undefined") return false; // SSR-safe
     return Boolean(
       document.fullscreenElement ||
       (document as any).webkitFullscreenElement

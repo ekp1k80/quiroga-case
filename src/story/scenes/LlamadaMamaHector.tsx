@@ -157,8 +157,8 @@ export default function LlamadaMamaHectorScene({
 					fixedTime="08:57"
 				>
 					<AudioPlayer
-						src={afterCallAudio.src}
-						blob={afterCallAudio.blob}
+						src={afterCallAudio?.src as string}
+						blob={afterCallAudio?.blob as Blob}
 						title={" "}
 						viz={viz as AudioVizConfig}
 						showControls={false}

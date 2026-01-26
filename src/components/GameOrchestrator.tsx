@@ -194,7 +194,8 @@ export default function GameOrchestrator() {
     return (
       <GameChatConsole
         title={chat.title ?? "Terminal"}
-        subtitle={chat.subtitle ?? `Nodo: ${user.storyNode}`}
+        subtitle={""}
+        // subtitle={chat.subtitle ?? `Nodo: ${user.storyNode}`}
         messages={flow.messages as any}
         choices={flow.choices}
         sending={flow.sending}
