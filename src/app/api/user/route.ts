@@ -23,6 +23,7 @@ export async function GET() {
       storyNode: user.storyNode,
       flags: user.flags ?? [],
       tags: user.tags ?? [],
+      playSessionId: user.playSessionId ?? null
     },
   });
 }

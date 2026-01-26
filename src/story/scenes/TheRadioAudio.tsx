@@ -25,13 +25,13 @@ type Props = {
 export default function TheRadioAudioScene({ onDone, audio }: Props) {
   const [scene, setScene] = useState<Scene>("mainAudio");
 
-  useEffect(() => {
-    const debugMode = process.env.NEXT_PUBLIC_SKIP_VIDEO_DEV === '1'
-    console.log(process.env.NEXT_PUBLIC_SKIP_VIDEO_DEV)
-    if(debugMode){
-      setTimeout(() => { onDone() }, 1000)
-    }
-  }, [])
+  // useEffect(() => {
+  //   const debugMode = process.env.NEXT_PUBLIC_SKIP_VIDEO_DEV === '1'
+  //   console.log(process.env.NEXT_PUBLIC_SKIP_VIDEO_DEV)
+  //   if(debugMode){
+  //     setTimeout(() => { onDone() }, 1000)
+  //   }
+  // }, [])
 
   return (
     <div style={{ width: "100%", height: "100%" }}>

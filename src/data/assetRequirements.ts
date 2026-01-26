@@ -41,7 +41,29 @@ export const ASSET_REQ_BY_NODE: Record<string, AssetReq> = {
   "the-radio-audio": {
     packs: ["the-radio-audio"],
   },
-  "eduardo-house-board": {
-    packs: ["eduardo-house"],
+  "casa-maria-cordoba": {
+    packs: ["casa-maria-cordoba"],
+  },
+  "recapitulacion-maria": {
+    packs: ["recapitulacion-maria"],
+  },
+  "llegada-casa-beatriz": {
+    packs: ["llegada-casa-beatriz"],
+  },
+  "beatriz-abre-puerta": {
+    packs: ["beatriz-abre-puerta"],
+  },
+  "martin-entra-habitacion-eduardo": {
+    packs: ["martin-entra-habitacion-eduardo"],
+  },
+  "hector-mom-final-call": {
+    packs: ["hector-mom-final-call"],
+    public: [
+			"/media/act1/llamada/colgar_llamada.mp3",
+			"/media/act1/llamada/incoming_call.mp3",
+    ],
+  },
+  "eduardo-leaked": {
+    packs: ["eduardo-leaked"],
   },
 };

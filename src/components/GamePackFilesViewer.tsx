@@ -113,7 +113,7 @@ export default function GamePackFilesViewer({
     [selectableFiles, selectedId]
   );
 
-  const [drawerOpen, setDrawerOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   // ✅ vistos (local)
   const [seenIds, setSeenIds] = useState<Set<string>>(() => new Set());

@@ -101,11 +101,11 @@ export default function AndroidIncomingCall({
     // Arranca el ringtone al montar la pantalla
     void startRingtone();
 
-    if (autoDeclineMs && autoDeclineMs > 0) {
-      timeoutRef.current = window.setTimeout(() => {
-        decline("timeout");
-      }, autoDeclineMs);
-    }
+    // if (autoDeclineMs && autoDeclineMs > 0) {
+    //   timeoutRef.current = window.setTimeout(() => {
+    //     decline("timeout");
+    //   }, autoDeclineMs);
+    // }
 
     return () => {
       stopRingtone();

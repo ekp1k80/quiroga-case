@@ -4,7 +4,7 @@
 import React from "react";
 import styled from "styled-components";
 
-type Tab = "chat" | "files" | "qr";
+type Tab = "chat" | "files" | "qr" | "finalPuzzle";
 
 type Props = {
   tabs: Tab[];
@@ -16,6 +16,11 @@ export default function GameNavbar({ tabs, active, onSelect }: Props) {
   return (
     <Bar>
       <Inner>
+        {tabs.includes("finalPuzzle") ? (
+          <Btn $active={active === "finalPuzzle"} onClick={() => onSelect("finalPuzzle")}>
+            Investigación
+          </Btn>
+        ) : null}
         {tabs.includes("chat") ? (
           <Btn $active={active === "chat"} onClick={() => onSelect("chat")}>
             Chat

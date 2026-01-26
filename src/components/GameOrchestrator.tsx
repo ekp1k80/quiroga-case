@@ -1,6 +1,7 @@
+// src\components\GameOrchestrator.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import styled from "styled-components";
 
 import GameNavbar from "@/components/GameNavbar";
@@ -20,9 +21,30 @@ import type { GameScreen } from "@/lib/resolveScreenFromStoryNode";
 import CharacterCreation from "./CharacterCreation";
 import FullScreenLoader from "./FullScreenLoader";
 import { EffectsList } from "@/types/effects";
-import FinalPuzzleOrchestrator from "./final/FinalPuzzleOrchestrator";
+import PlaySessionLobby from "./PlaySessionLobby";
+import FinalPuzzleOrchestrator from "./FinalPuzzleOrchestrator";
+import { useRtdbValue } from "@/hooks/useRtdbValue";
+import { useQr3RoleFromState } from "@/hooks/useQr3RoleFromState";
 
 type Tab = "chat" | "files" | "qr";
+
+type LobbyState = {
+  code?: string;
+  phase?: "lobby" | "running" | "done";
+  players?: Record<string, { name: string; joinedAt: number }>;
+   qr3?: {
+    groups?: Record<
+      string,
+      {
+        idx?: number;
+        playerIds?: string[];
+        status?: "active" | "done";
+        score?: number;
+        rank?: number;
+      }
+    >;
+  };
+};
 
 export default function GameOrchestrator() {
   const { user, status, fetchUser, setUser } = useUserState();
@@ -50,6 +72,25 @@ export default function GameOrchestrator() {
     bumpStoryEpoch,
   });
 
+  const { value: playSessionState, error } = useRtdbValue<LobbyState>(`playSessions/${user?.playSessionId}`);
+  const qr3 = playSessionState?.qr3;
+
+  const {pack, groupId} = useQr3RoleFromState(qr3, user?.id);
+
+  const advance = async () => {
+    await applyAdvanced({
+      from: 'qr3',
+      to: 'hector-mom-final-call'
+    })
+  }
+
+  useEffect(() => {
+    if (playSessionState?.phase === "done") {
+      fetchUser()
+      advance()
+    }
+  }, [playSessionState?.phase]);
+
   useEffect(() => {
     doBoot();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -72,6 +113,8 @@ export default function GameOrchestrator() {
         <FullScreenLoader label={transitionLabel} />
       ) : boot !== "ready" || !user || !screen ? (
         <FullScreenLoader label={boot === "error" ? bootError ?? "Error" : "Cargando…"} />
+      ): (user.playSessionId && playSessionState?.phase === "lobby") ? (
+        <PlaySessionLobby playSessionId={user?.playSessionId} />
       ) : screen.kind === "storyteller" ? (
         <StorytellerOverlay
           key={`${screen.sceneId}:${storyEpoch}`}
@@ -83,13 +126,26 @@ export default function GameOrchestrator() {
             if (data.ok && (data as any).effects?.length) await applyEffects((data as any).effects);
           }}
         />
-      ) : screen.kind === "final-puzzle" ? (
-        <FinalPuzzleOrchestrator
-          user={user}
-          onAdvanced={async (adv) => {
-            await applyAdvanced({ from: adv.from, to: adv.to });
-          }}
-        />
+      ) : (screen?.kind === "finalPuzzle" && screen.play === "qr3") ? (
+        <Shell>
+          <Body>
+            <Center>
+              <Panel>
+                { activeTab === "finalPuzzle" ?
+                  (
+                    <FinalPuzzleOrchestrator
+                      user={user as any}
+                      groupId={groupId}
+                    />
+                  ) : activeTab === "files" ? (
+                    <FilesPanel user={user} packId={pack} />
+                  ) : <></>
+                }
+              </Panel>
+            </Center>
+          </Body>
+          <GameNavbar tabs={tabs} active={activeTab as Tab} onSelect={setActiveTab as any} />
+        </Shell>
       ) : (
         <Shell>
           <Body>
@@ -149,8 +205,8 @@ export default function GameOrchestrator() {
     );
   }
 
-  function FilesPanel({ user }: { user: any }) {
-    return <GamePackFilesViewer packId={user.storyNode} title="Archivos" prefetch="all" />;
+  function FilesPanel({ user, packId }: { user: any, packId?: string }) {
+    return <GamePackFilesViewer packId={packId ?? user.storyNode} title="Archivos" prefetch="all" />;
   }
 
   function QrPanel() {
@@ -159,7 +215,12 @@ export default function GameOrchestrator() {
     return (
       <div style={{ width: "100%", height: "100%" }}>
         {open ? (
-          <QrClaimScanner onClose={() => setOpen(false)} onClaimed={() => {}} />
+          <QrClaimScanner onClose={() => setOpen(false)} onClaimed={
+            async (response) => {
+              if (response.ok && response.advanced) await applyAdvanced(response.advanced);
+              if (response.ok && response.effects?.length) await applyEffects(response.effects as EffectsList);
+            }
+          } />
         ) : (
           <div style={{ color: "#fff", opacity: 0.8, padding: 14 }}>
             Scanner cerrado. Volvé a abrirlo desde la pestaña QR.

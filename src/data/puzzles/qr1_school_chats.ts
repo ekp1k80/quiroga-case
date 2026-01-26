@@ -16,7 +16,7 @@ export const BEFORE_SCAN_QR1_CHAT_FLOW: PuzzleFlow = {
 
   // ⚠️ no va a ejecutarse “solo” desde el chat.
   // El avance real a "chat-qr1" ocurre por QR claim (afuera del chat).
-  onSuccess: { storyNode: "chat-qr1" },
+  onSuccess: { storyNode: "before-scan-qr1-chat" },
 
   blockedMessage: "Todavía no podés acceder a esta secuencia.",
 

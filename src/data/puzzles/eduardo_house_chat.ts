@@ -1,7 +1,7 @@
 // src/data/puzzles/qr3_eduardo_house_chat.ts
 import { type PuzzleFlow } from "@/data/puzzles/puzzleFlows";
 
-export const QR3_EDUARDO_HOUSE_CHAT_FLOW: PuzzleFlow = {
+export const EDUARDO_HOUSE_CHAT_FLOW: PuzzleFlow = {
   packId: "eduardo-house-chat",
   puzzleId: "eduardo-house-chat",
 
@@ -374,7 +374,7 @@ export const QR3_EDUARDO_HOUSE_CHAT_FLOW: PuzzleFlow = {
 
     {
       // ✅ Imagen en chat: el backend devuelve referencia al pack
-      prompt: [{ type: "packFile", fileId: "eduardo_board_wall" }],
+      prompt: [{ type: "packFile", fileId: "act4/BoardImagen.png" }],
       choices: [{ id: "open_board", label: "Ver el tablero por partes" }],
       choiceReplies: {
         open_board: {

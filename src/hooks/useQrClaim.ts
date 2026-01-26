@@ -15,6 +15,7 @@ export type QrClaimResponse = {
   alreadyClaimed?: boolean;
 
   error?: string;
+  advanced?: {from: string, to: string}; 
 };
 
 export function useQrClaim(opts?: {

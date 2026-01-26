@@ -14,6 +14,14 @@ import PrologueScene from "@/story/scenes/Prologue1";
 import ViajeCentragoloScene from "@/story/scenes/ViajeCentragoloScene";
 import WiFiRouterHackScene from "./WiFiRouterHackScene";
 import TheRadioAudioScene from "@/story/scenes/TheRadioAudio";
+import CasaMariaCordobaScene from "@/story/scenes/CasaMariaCordoba";
+import RecapitulacionScene from "@/story/scenes/RecapitulacionMaria";
+import LlegadaCasaBeatrizScene from "@/story/scenes/LlegadaCasaBeatriz";
+import BeatrizAbreLaPuertaScene from "@/story/scenes/BeatrizAbreLaPuerta";
+import MartinEntraHabitacionEduardoScene from "@/story/scenes/MartinEntraHabitacionEduardo";
+import LlamadaFinalMamaHectorScene from "@/story/scenes/LlamadaFinalMamaHector";
+import SocialStormScene from "./SocialStorm/SocialStormScene";
+import EduardoLeakedScene from "@/story/scenes/EduardoLeaked";
 
 type Asset = { src: string; blob: Blob };
 type AssetMap = Record<string, Asset | undefined>;
@@ -84,6 +92,58 @@ const SCENES: Record<string, SceneComponent> = {
 
     return <TheRadioAudioScene onDone={onDone} audio={audio} />;
   },
+
+  "casa-maria-cordoba": ({ onDone, assets }) => {
+    console.log("assets", assets)
+    return <CasaMariaCordobaScene onDone={onDone} audio={assets["act4/interrogatorio_maria.mp3"]} />
+  },
+  
+  "recapitulacion-maria": ({ onDone, assets }) => {
+    console.log("assets", assets)
+    return <RecapitulacionScene onDone={onDone} audio={assets["act4/recapitulacion_maria.mp3"]} />
+  },
+  
+  "llegada-casa-beatriz": ({ onDone, assets }) => {
+    console.log("assets", assets)
+    return <LlegadaCasaBeatrizScene onDone={onDone} audio={assets["act4/llegada_casa_beatriz.mp3"]} />
+  },
+  
+  "beatriz-abre-puerta": ({ onDone, assets }) => {
+    console.log("assets", assets)
+    return <BeatrizAbreLaPuertaScene onDone={onDone} audio={assets["act4/beatriz_abre_la_puerta.mp3"]} />
+  },
+  
+  "hector-mom-final-call": ({ onDone, assets }) => {
+    console.log("hector-mom-final-call assets", assets)
+    return (
+      <LlamadaFinalMamaHectorScene
+      onDone={onDone}
+      audios={{
+        colgarLlamada: assets["/media/act1/llamada/colgar_llamada.mp3"]?.src as string,
+        incomingCall: assets["/media/act1/llamada/incoming_call.mp3"]?.src as string,
+        adiosHector: assets["act5/adios_hector.mp3"],
+        afterLlamadaAdiosHector: assets["act5/after_llamada_adios_hector.mp3"],
+        llamadaAdiosHector: assets["act5/llamada_adios_hector.mp3"],
+      }}
+      />
+    )
+  },
+  "social-app-noise": ({ onDone, assets }) => {
+    return <SocialStormScene seed={1337} onDone={onDone} />;
+  },
+  "eduardo-leaked": ({ onDone, assets }) => {
+    console.log("eduardo-leaked", assets)
+    return (
+      <EduardoLeakedScene
+        onDone={onDone}
+        audios={{
+          audio1: assets["leaked/el_inicio.mp3"],
+          audio2: assets["leaked/captura.mp3"],
+        }}
+      />
+    )
+  },
+  
 };
 
 type Props = {

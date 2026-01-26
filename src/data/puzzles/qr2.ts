@@ -162,13 +162,7 @@ export const QR2_FLOW: PuzzleFlow = {
       badMessages: ["Respondé SI, NO o PARCIAL."],
       effectsOnDone: { saveField: "qr2.obs.egreso_registros" },
     },
-    {
-      prompt: "Bueno, ya analizamos bastante informacion? Y ahora que hacemos? Con quien hablamos? De que hilo tiramos?",
-      check: (input) => ["si", "no", "parcial"].includes(input.trim().toLowerCase()),
-      okMessages: ["Formulario completado."],
-      badMessages: ["Respondé SI, NO o PARCIAL."],
-      effectsOnDone: { saveField: "qr2.obs.egreso_registros" },
-    },
+ 
     {
       prompt: "Bueno, ya analizamos bastante informacion? Y ahora que hacemos? Con quien hablamos? De que hilo tiramos?",
       choices: [

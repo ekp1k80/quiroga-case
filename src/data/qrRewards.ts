@@ -31,6 +31,25 @@ export function normCode(code: string) {
 }
 
 export const QR_REWARDS: Record<string, QrReward> = {
+  "SV-QR-1": {
+    code: "SV-QR-1",
+    requires: { type: "story", node: "before-scan-qr1-chat" },
+    oneTime: false,
+    onClaim: { storyNode: "chat-qr1" },
+  },
+  "SV-QR-2": {
+    code: "SV-QR-2",
+    requires: { type: "story", node: "before-scan-qr2-chat" },
+    oneTime: false,
+    onClaim: { storyNode: "qr2-chat" },
+  },
+  "SV-QR-3": {
+    code: "SV-QR-3",
+    requires: { type: "story", node: "before-scan-qr3-chat" },
+    oneTime: false,
+    onClaim: { storyNode: "qr3" },
+  },
+
   "SV-QR-INTRO": {
     code: "SV-QR-INTRO",
     requires: { type: "story", node: "prologue-1" },

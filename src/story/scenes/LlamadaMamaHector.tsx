@@ -43,7 +43,7 @@ export default function LlamadaMamaHectorScene({
     spamReligioso
   }
 }: Props) {
-  const [scene, setScene] = useState<Scene>("afterCall");
+  const [scene, setScene] = useState<Scene>("lock");
 
    // Control de tiempos (ajustá a gusto)
   const NOTIF_DELAY_MS = 1800;   // cuando aparece la notificación

@@ -11,6 +11,7 @@ export type UserPayload = {
   storyNode: string;
   flags: string[];
   tags: string[];
+  playSessionId: string;
 };
 
 type UserRes = { ok: boolean; user?: UserPayload; error?: string };

@@ -110,7 +110,7 @@ export const QR2_CHAT_FLOW: PuzzleFlow = {
         "Anotás lo que tenés:",
         "— Sofía R.",
         "— Eduardo R. (contador)",
-        "— Mariana G.",
+        "— Maria C.",
         "",
         "No sabés qué significa todo… pero ahora sí podés hacer algo.",
         "¿Por dónde arrancás?",
@@ -119,7 +119,7 @@ export const QR2_CHAT_FLOW: PuzzleFlow = {
         { id: "q1", label: "Buscar: “Eduardo R. contador”" },
         { id: "q2", label: "Buscar: “Sofía R desaparecida”" },
         { id: "q3", label: "Buscar: “Eduardo R Sofía R”" },
-        { id: "q4", label: "Buscar: “Mariana G Sofía R”" },
+        { id: "q4", label: "Buscar: “Maria C Sofía R”" },
       ],
       choiceReplies: {
         q1: {

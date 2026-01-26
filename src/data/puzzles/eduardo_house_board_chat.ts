@@ -1,7 +1,7 @@
 // src/data/puzzles/qr3_eduardo_house_chat.ts
 import { type PuzzleFlow } from "@/data/puzzles/puzzleFlows";
 
-export const QR3_EDUARDO_HOUSE_BOARD_CHAT_FLOW: PuzzleFlow = {
+export const EDUARDO_HOUSE_BOARD_CHAT_FLOW: PuzzleFlow = {
   packId: "eduardo-house-board-chat",
   puzzleId: "eduardo-house-board-chat",
 
@@ -15,13 +15,13 @@ export const QR3_EDUARDO_HOUSE_BOARD_CHAT_FLOW: PuzzleFlow = {
   steps: [
     {
       prompt: [
-        "Cuando estes listo/a puedes continuar.",
+        "Cuando veas lo que encontraste en la pared Eduardo puedes continuar...",
       ],
       choices: [{ id: "continue", label: "Continuar" }],
       choiceReplies: {
         continue: {
           messages: [],
-          advance: false,
+          advance: true,
         },
       },
       check: () => true,

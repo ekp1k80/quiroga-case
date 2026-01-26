@@ -1,12 +1,12 @@
 // src/hooks/orchestrator/useGameState.ts
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveScreenFromStoryNode, type GameScreen } from "@/lib/resolveScreenFromStoryNode";
 import type { UserPayload } from "@/hooks/orchestrator/useUserState";
 import { useNodeAssets } from "@/hooks/orchestrator/useNodeAssets";
 
-export type Tab = "chat" | "files" | "qr";
+export type Tab = "chat" | "files" | "qr" | "finalPuzzle";
 export type ProgressAdvanced = { from: string; to: string };
 
 export function useGameState({
@@ -35,6 +35,18 @@ export function useGameState({
 
   const bootInFlightRef = useRef(false);
   const lastBootKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if(user?.storyNode === "qr3"){
+      setTabs(["files", "finalPuzzle"])
+      setActiveTab("finalPuzzle")
+      return
+    } else {
+      if(tabs.includes("finalPuzzle")){
+        setTabs(["chat", "files", "qr"])
+      }
+    }
+  }, [user?.storyNode])
 
   const applyResolved = useCallback(
     async (u: UserPayload, resolved: ReturnType<typeof resolveScreenFromStoryNode>) => {
@@ -73,6 +85,10 @@ export function useGameState({
         tabs: resolved.tabs,
         defaultTab: resolved.defaultTab ?? null,
       });
+      console.log("resolved.defaultTab", resolved.defaultTab)
+      if(resolved.defaultTab) {
+        setActiveTab(resolved.defaultTab)
+      }
 
       if (lastBootKeyRef.current === bootKey) {
         setUser(u); // keep fresh user payload anyway

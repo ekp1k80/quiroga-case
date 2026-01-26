@@ -103,8 +103,8 @@ export default function GameChatConsole({
   systemTyping,
   onSend,
   clearKey,
-  prologueDelayMs = 650,
-  systemChainDelayMs = 650,
+  prologueDelayMs = 1500,
+  systemChainDelayMs = 1500,
   chainTypingMs = 520,
 }: Props) {
   const [value, setValue] = useState("");

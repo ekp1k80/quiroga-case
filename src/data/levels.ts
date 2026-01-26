@@ -10,6 +10,7 @@ export const STORY_FLOW = [
   { name: 'act2-sofia', deps: ['the-horror'] },  // able to watch act 2 Sofia
   { name: 'act2-the-camera-game', deps: ['act2-sofia'] },  // able to watch act 2 The Camera game
   { name: 'act2-the-camera-audio', deps: ['act2-the-camera-game'] },  // able to watch act 2 The Camera audio
+  
   { name: 'chat-to-school-1', deps: ['act2-the-camera-audio'] }, // show the player the first puzzle
   { name: 'chat-to-school-2', deps: ['chat-to-school-1'] }, // show the player the first puzzle
   { name: 'the-radio-chat', deps: ['chat-to-school-2'] }, // able to watch act 3 The radio chat to reproduce the radio audio
@@ -22,24 +23,20 @@ export const STORY_FLOW = [
   { name: 'eduardo-house-chat', deps: ['qr2-puzzle'] }, // story telling of arrive to Eduardo's house
   { name: 'eduardo-house-board-chat', deps: ['eduardo-house-chat'] }, // all the file of the Eduardo's house board are available
   { name: 'eduardo-house-next-chat', deps: ['eduardo-house-board-chat'] }, // after user see all the board files they are able to continue to Maria Cordoba house
-  { name: 'after-casa-eduardo', deps: ['eduardo-house-next-chat'] }, // able to watch maria cordoba
+  { name: 'after-casa-eduardo', deps: ['eduardo-house-next-chat'] }, // chat after Eduardo's house to advance to next
   { name: 'casa-maria-cordoba', deps: ['after-casa-eduardo'] }, // able to watch maria cordoba
   { name: 'recapitulacion-maria', deps: ['casa-maria-cordoba'] }, // able to watch recapitulacion maria cordoba
   { name: 'llegada-casa-beatriz', deps: ['recapitulacion-maria'] }, // able to watch llegada a la casa de beatriz
   { name: 'beatriz-abre-puerta', deps: ['llegada-casa-beatriz'] }, // able to watch beatriz abre la puerta
   { name: 'martin-entra-habitacion-eduardo', deps: ['beatriz-abre-puerta'] }, // able to watch martin entra habitacion eduardo
   { name: 'before-scan-qr3-chat', deps: ['martin-entra-habitacion-eduardo'] }, // Final puzzle with all the files available
-  { name: 'qr3', deps: ['martin-entra-habitacion-eduardo'] }, // Final puzzle with all the files available
-  { name: 'hector-mom-final-call', deps: ['martin-entra-habitacion-eduardo'] }, // able to watch hector's mom final call
+  { name: 'qr3', deps: ['before-scan-qr3-chat'] }, // Final puzzle with all the files available
+  { name: 'hector-mom-final-call', deps: ['qr3'] }, // able to watch hector's mom final call
   { name: 'social-app-noise', deps: ['hector-mom-final-call'] }, // able to watch hector's mom final call
-  { name: 'eduardo-leaked-1', deps: ['social-app-noise'] }, // able to watch Eduardo leakead audio 1
-  { name: 'eduardo-leaked-2', deps: ['eduardo-leaked-1'] }, // able to watch Eduardo leakead audio 2
-  { name: 'eduardo-leaked-3', deps: ['eduardo-leaked-2'] }, // able to watch Eduardo leakead audio 3
-  { name: 'sinclair-event', deps: ['eduardo-leaked-3'] }, // able to watch Eduardo leakead audio 3
-  { name: 'investigation-open', deps: ['sinclair-event'] }, // able to watch Eduardo leakead audio 3
-  { name: 'congressman', deps: ['investigation-open'] }, // able to watch Eduardo leakead audio 3
-  { name: 'investigation-close', deps: ['congressman'] }, // able to watch Eduardo leakead audio 3
-  { name: 'final-interview', deps: ['investigation-close'] }, // able to watch Eduardo leakead audio 3
+  { name: 'eduardo-leaked', deps: ['social-app-noise'] }, // able to watch Eduardo leakead audio 1
+  // { name: 'sinclair-event', deps: ['eduardo-leaked-3'] }, // able to watch Eduardo leakead audio 3
+  { name: 'investigation', deps: ['eduardo-leaked'] }, // final investigation, congressman and close
+  { name: 'credits', deps: ['investigation'] }, // able to watch credits
 ]
 
 export type StoryNode = (typeof STORY_FLOW)[number]['name']

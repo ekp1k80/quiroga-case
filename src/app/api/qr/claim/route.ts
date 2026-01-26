@@ -25,6 +25,7 @@ type Res = {
   alreadyClaimed?: boolean;
 
   error?: string;
+  advanced?: { from: string; to: string };
 };
 
 export async function POST(req: Request) {
@@ -102,5 +103,6 @@ export async function POST(req: Request) {
     message: reward.message ?? "OK.",
     urls: reward.urls ?? [],
     effects: reward.effects ?? {},
+    advanced: reward.onClaim?.storyNode ? { from: user.storyNode, to: reward.onClaim?.storyNode } : undefined
   });
 }

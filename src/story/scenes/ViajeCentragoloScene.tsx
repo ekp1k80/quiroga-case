@@ -37,9 +37,9 @@ type Props = {
 export default function ViajeCentragoloScene({ onDone, viaje, hospital }: Props) {
   const [scene, setScene] = useState<Scene>("viaje");
 
-  useEffect(() => {
-    setTimeout(() => { onDone() }, 3000)
-  }, [])
+  // useEffect(() => {
+  //   setTimeout(() => { onDone() }, 3000)
+  // }, [])
 
   return (
     <div style={{ width: "100%", height: "100%" }}>

@@ -13,10 +13,11 @@ function getAdminCreds() {
 
 export function getAdminApp() {
   if (admin.apps.length > 0) return admin.app();
-
+  console.log("process.env.FIREBASE_DATABASE_URL", process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL)
 
 	admin.initializeApp({
     credential: admin.credential.cert(getAdminCreds()),
+    databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
   });
 
   return admin.app();
@@ -25,6 +26,11 @@ export function getAdminApp() {
 export function db() {
   getAdminApp();
   return admin.firestore();
+}
+
+export const rtdb = () => {
+  getAdminApp();
+  return admin.database();
 }
 
 export const FieldValue = admin.firestore.FieldValue;

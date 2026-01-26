@@ -1,7 +1,7 @@
 // src/data/puzzles/qr3_eduardo_house_next_chat.ts
 import { type PuzzleFlow } from "@/data/puzzles/puzzleFlows";
 
-export const QR3_EDUARDO_HOUSE_NEXT_CHAT_FLOW: PuzzleFlow = {
+export const EDUARDO_HOUSE_NEXT_CHAT_FLOW: PuzzleFlow = {
   packId: "eduardo-house-next-chat",
   puzzleId: "eduardo-house-next-chat",
 

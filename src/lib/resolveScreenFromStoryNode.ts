@@ -6,7 +6,7 @@ export type GameScreen =
   | { kind: "files"; packId: string; title?: string }
   | { kind: "qr"; title?: string }
   | { kind: "storyteller"; sceneId: string }
-  | { kind: "final-puzzle"; storyNode: string };
+  | { kind: "finalPuzzle"; play: "qr3" };
 
 type ScreenResolve = {
   // pantalla principal (lo que se auto-muestra)
@@ -26,9 +26,9 @@ export function resolveScreenFromStoryNode(storyNode: StoryNode): ScreenResolve 
 
   if (storyNode === "qr3") {
     return {
-      primary: { kind: "final-puzzle", storyNode: "qr3" },
-      tabs: ["files"],
-      defaultTab: "files",
+      primary: { kind: "finalPuzzle", play: "qr3" },
+      tabs: ["chat", "files", "qr"],
+      defaultTab: "chat",
     };
   }
 
@@ -86,22 +86,113 @@ export function resolveScreenFromStoryNode(storyNode: StoryNode): ScreenResolve 
   if (storyNode === "the-radio-audio") {
     return { primary: { kind: "storyteller", sceneId: "the-radio-audio" }, tabs: baseTabs };
   }
-
-  if (storyNode === "eduardo-house-chat") {
+  if (storyNode === "before-scan-qr1-chat") {
     return {
-      primary: { kind: "chat", packId: "eduardo-house", puzzleId: "eduardo-house-chat", title: "Terminal" },
+      primary: { kind: "chat", packId: "before-scan-qr1-chat", puzzleId: "before-scan-qr1-chat", title: "Llegada a la escuela" },
       tabs: baseTabs,
       defaultTab: "chat",
     };
   }
-
-  if (storyNode === "eduardo-house-board") {
+  if (storyNode === "chat-qr1") {
     return {
-      primary: { kind: "files", packId: "eduardo-house", title: "Tablero de Eduardo" },
+      primary: { kind: "chat", packId: "chat-qr1", puzzleId: "chat-qr1", title: "Escuela" },
+      tabs: baseTabs,
+      defaultTab: "chat",
+    };
+  }
+  if (storyNode === "before-scan-qr2-chat") {
+    return {
+      primary: { kind: "chat", packId: "before-scan-qr2-chat", puzzleId: "before-scan-qr2-chat", title: "Vuelta" },
+      tabs: baseTabs,
+      defaultTab: "chat",
+    };
+  }
+  if (storyNode === "qr2-chat") {
+    return {
+      primary: { kind: "chat", packId: "qr2-chat", puzzleId: "qr2-chat", title: "Desaparición" },
+      tabs: baseTabs,
+      defaultTab: "chat",
+    };
+  }
+  if (storyNode === "qr2-puzzle") {
+    return {
+      primary: { kind: "chat", packId: "qr2-puzzle", puzzleId: "qr2-puzzle", title: "Desaparición" },
       tabs: baseTabs,
       defaultTab: "files",
     };
   }
+  
+  if (storyNode === "eduardo-house-chat") {
+    return {
+      primary: { kind: "chat", packId: "eduardo-house-chat", puzzleId: "eduardo-house-chat", title: "Casa de eduardo" },
+      tabs: baseTabs,
+      defaultTab: "chat",
+    };
+  }
+  if (storyNode === "eduardo-house-board-chat") {
+    return {
+      primary: { kind: "chat", packId: "eduardo-house-board-chat", puzzleId: "eduardo-house-board-chat", title: "La pared" },
+      tabs: baseTabs,
+      defaultTab: "files",
+    };
+  }
+  if (storyNode === "eduardo-house-next-chat") {
+    return {
+      primary: { kind: "chat", packId: "eduardo-house-next-chat", puzzleId: "eduardo-house-next-chat", title: "El hilo" },
+      tabs: baseTabs,
+      defaultTab: "chat",
+    };
+  }
+  if (storyNode === "casa-maria-cordoba") {
+    return { primary: { kind: "storyteller", sceneId: "casa-maria-cordoba" }, tabs: baseTabs };
+  }
+  if (storyNode === "recapitulacion-maria") {
+    return { primary: { kind: "storyteller", sceneId: "recapitulacion-maria" }, tabs: baseTabs };
+  }
+  if (storyNode === "llegada-casa-beatriz") {
+    return { primary: { kind: "storyteller", sceneId: "llegada-casa-beatriz" }, tabs: baseTabs };
+  }
+  if (storyNode === "beatriz-abre-puerta") {
+    return { primary: { kind: "storyteller", sceneId: "beatriz-abre-puerta" }, tabs: baseTabs };
+  }
+  if (storyNode === "martin-entra-habitacion-eduardo") {
+    return { primary: { kind: "storyteller", sceneId: "martin-entra-habitacion-eduardo" }, tabs: baseTabs };
+  }
+  if (storyNode === "before-scan-qr3-chat") {
+    return {
+      primary: { kind: "chat", packId: "before-scan-qr3-chat", puzzleId: "before-scan-qr3-chat", title: "Huida" },
+      tabs: baseTabs,
+      defaultTab: "chat",
+    };
+  }
+  if (storyNode === "qr3") {
+    return {
+      primary: { kind: "chat", packId: "qr3", puzzleId: "qr3", title: "Que paso?" },
+      tabs: baseTabs,
+      defaultTab: "chat",
+    };
+  }
+  
+  if (storyNode === "hector-mom-final-call") {
+    return { primary: { kind: "storyteller", sceneId: "hector-mom-final-call" }, tabs: baseTabs };
+  }
+  if (storyNode === "social-app-noise") {
+    return { primary: { kind: "storyteller", sceneId: "social-app-noise" }, tabs: baseTabs };
+  }
+  if (storyNode === "eduardo-leaked") {
+    return { primary: { kind: "storyteller", sceneId: "eduardo-leaked" }, tabs: baseTabs };
+  }
+  if (storyNode === "investigation") {
+    return  {
+      primary: { kind: "chat", packId: "investigation", puzzleId: "investigation", title: "investigation" },
+      tabs: baseTabs,
+      defaultTab: "files",
+    }
+  }
+  if (storyNode === "credits") {
+    return { primary: { kind: "storyteller", sceneId: "credits" }, tabs: baseTabs };
+  }
+
 
   // Default: dejalo en chat genérico (o storyteller si lo preferís)
   return {
