@@ -74,19 +74,63 @@ export default function QrScanner({
         const inst = new Html5Qrcode(readerId);
         qrRef.current = inst;
 
+        const config = { fps: 12, qrbox: { width: 240, height: 240 } };
+
+        // 1) Intento principal: pedir cámara trasera por facingMode
+        try {
+          await inst.start(
+            { facingMode: "environment" },
+            config,
+            async (decodedText) => {
+              if (cancelled || cooldown) return;
+
+              const code = decodedText?.trim();
+              if (!code) return;
+              if (code === lastCode) return;
+
+              setCooldown(true);
+              setTimeout(() => setCooldown(false), cooldownMs);
+
+              setLastCode(code);
+              setStatus("processing");
+
+              try {
+                await onCode(code);
+                if (cancelled) return;
+
+                setStatus("done");
+                if (stopOnSuccess) await stopCamera();
+                else setStatus("scanning");
+              } catch {
+                if (cancelled) return;
+                setStatus("scanning");
+              }
+            },
+            () => {}
+          );
+
+          if (!cancelled) setStatus("scanning");
+          return;
+        } catch {
+          // si falla el facingMode (algunos browsers raros), caemos a enumeración
+        }
+
+        // 2) Fallback: elegir “la más trasera” por label (cuando está disponible)
         const devices = await Html5Qrcode.getCameras();
         if (!devices?.length) throw new Error("No camera");
 
+        const pickBack =
+          devices.find((d) => /back|rear|environment/i.test(d.label || "")) ??
+          devices[devices.length - 1]; // último suele ser trasera en Android
+
         await inst.start(
-          devices[0].id,
-          { fps: 12, qrbox: { width: 240, height: 240 } },
+          pickBack.id,
+          config,
           async (decodedText) => {
             if (cancelled || cooldown) return;
 
             const code = decodedText?.trim();
             if (!code) return;
-
-            // dedupe simple
             if (code === lastCode) return;
 
             setCooldown(true);
@@ -104,7 +148,6 @@ export default function QrScanner({
               else setStatus("scanning");
             } catch {
               if (cancelled) return;
-              // si onCode falla, volvemos a escanear
               setStatus("scanning");
             }
           },
@@ -116,6 +159,7 @@ export default function QrScanner({
         if (!cancelled) setStatus("error");
       }
     }
+
 
     start();
 
