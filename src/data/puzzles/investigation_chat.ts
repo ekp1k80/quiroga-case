@@ -253,13 +253,9 @@ export const INVESTIGATION_CHAT_FLOW: PuzzleFlow = {
         "Gracias por estar.",
         "...",
 
-        "Algunas historias no se cierran.",
-        "Se cargan.",
-        "...",
-
         "Bay"
       ],
-      choices: [{ id: "final", label: "..." }],
+      choices: [{ id: "final", label: "Aplausos" }],
       choiceReplies: {
         final: {
           messages: [],
