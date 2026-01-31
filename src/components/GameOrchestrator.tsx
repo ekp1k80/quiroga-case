@@ -30,7 +30,7 @@ type Tab = "chat" | "files" | "qr";
 
 type LobbyState = {
   code?: string;
-  phase?: "lobby" | "running" | "done";
+  phase?: "lobby" | "grouping" | "running" | "done";
   players?: Record<string, { name: string; joinedAt: number }>;
    qr3?: {
     groups?: Record<
@@ -113,7 +113,10 @@ export default function GameOrchestrator() {
         <FullScreenLoader label={transitionLabel} />
       ) : boot !== "ready" || !user || !screen ? (
         <FullScreenLoader label={boot === "error" ? bootError ?? "Error" : "Cargando…"} />
-      ): (user.playSessionId && playSessionState?.phase === "lobby") ? (
+      ) : user.playSessionId && playSessionState?.phase === "grouping" ? (
+        <PlaySessionGroupFormation playSessionId={user.playSessionId} userId={user.id} />
+      )
+      : (user.playSessionId && playSessionState?.phase === "lobby") ? (
         <PlaySessionLobby playSessionId={user?.playSessionId} />
       ) : screen.kind === "storyteller" ? (
         <StorytellerOverlay

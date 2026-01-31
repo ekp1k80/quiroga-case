@@ -7,7 +7,7 @@ import { useRtdbValue } from "@/hooks/useRtdbValue";
 
 type LobbyState = {
   code?: string;
-  phase?: "lobby" | "running" | "done";
+  pphase?: "lobby" | "grouping" | "running" | "done";
   players?: Record<string, { name: string; joinedAt: number }>;
 };
 

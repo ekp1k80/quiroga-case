@@ -50,6 +50,7 @@ export default function CharacterCreation({ onCreated, onClose }: Props) {
       }
 
       await onCreated();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       setError(e?.message ?? "Error");
       setBusy(false);
