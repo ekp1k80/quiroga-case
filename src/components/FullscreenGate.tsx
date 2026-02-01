@@ -73,7 +73,6 @@ const Full = styled.div`
   background: #000;
   display: grid;
   place-items: center;
-  padding: 18px;
   z-index: 9999;
 `;
 
