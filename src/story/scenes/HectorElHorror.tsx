@@ -46,6 +46,7 @@ export default function HectorElHorrorScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="hector_el_horror"
           />
         </ViewportWrapper>
       )}

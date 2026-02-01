@@ -51,9 +51,10 @@ export default function EduardoLeakedScene({
 						showControls={false}
 						autoPlay
 						barCount={50}
+						audioKey="eduardo_leaked_1"
 						onEnded={() => {
-              setScene("audio2");
-            }}
+							setScene("audio2");
+						}}
 					/>
 				</ViewportWrapper>
 			)}
@@ -69,7 +70,8 @@ export default function EduardoLeakedScene({
 						showControls={false}
 						autoPlay
 						barCount={50}
-            onEnded={onDone}
+            			onEnded={onDone}
+						audioKey="audio_leaked_2"
 					/>
 				</ViewportWrapper>
 			)}

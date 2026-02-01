@@ -92,6 +92,7 @@ export default function LlamadaFinalMamaHectorScene({
 						showControls={false}
 						autoPlay
 						barCount={50}
+            audioKey="after_llamada_adios_hector"
 						onEnded={() => {
               setScene("lastAudio");
             }}
@@ -112,6 +113,7 @@ export default function LlamadaFinalMamaHectorScene({
 						autoPlay
 						barCount={50}
 						onEnded={onDone}
+            audioKey="adios_hector"
 					/>
 				</ViewportWrapper>
 			)}

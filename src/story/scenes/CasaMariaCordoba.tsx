@@ -46,6 +46,7 @@ export default function CasaMariaCordobaScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="casa_maria_cordoba"
           />
         </ViewportWrapper>
       )}

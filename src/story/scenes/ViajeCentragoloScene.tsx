@@ -75,6 +75,7 @@ export default function ViajeCentragoloScene({ onDone, viaje, hospital }: Props)
                 autoPlay
                 barCount={50}
                 onEnded={() => setScene("idle1")}
+                audioKey="viaje_centragolo_1"
               />
             )}
           </>
@@ -98,6 +99,7 @@ export default function ViajeCentragoloScene({ onDone, viaje, hospital }: Props)
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="viaje_centragolo_2"
           />
         </ViewportWrapper>
       )}

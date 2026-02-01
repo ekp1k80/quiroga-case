@@ -46,6 +46,7 @@ export default function TheRadioAudioScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="the_radio_audio"
           />
         </ViewportWrapper>
       )}

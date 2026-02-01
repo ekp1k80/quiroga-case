@@ -16,7 +16,7 @@ export function useGameState({
 }: {
   user: UserPayload | null;
   setUser: React.Dispatch<React.SetStateAction<UserPayload | null>>;
-  fetchUser: () => Promise<UserPayload>;
+  fetchUser: () => Promise<UserPayload | null>;
 }) {
   const { storyAssets, prefetchForNode } = useNodeAssets();
 
@@ -75,7 +75,7 @@ export function useGameState({
     setBootError(null);
 
     try {
-      const u = await fetchUser();
+      const u = await fetchUser() as UserPayload;
       const resolved = resolveScreenFromStoryNode(u.storyNode as any);
 
       const bootKey = JSON.stringify({

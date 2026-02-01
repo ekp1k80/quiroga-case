@@ -46,6 +46,7 @@ export default function MartinEntraHabitacionEduardoScene({ onDone, audio }: Pro
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="martin_entra_habitacion_eduardo"
           />
         </ViewportWrapper>
       )}

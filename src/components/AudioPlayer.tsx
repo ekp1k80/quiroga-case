@@ -6,6 +6,7 @@ import { AudioVizConfig } from "@/data/packs";
 import { useUserState } from "@/hooks/orchestrator/useUserState";
 
 type Props = {
+  audioKey?: string;
   src: string;
   blob: Blob;
   title?: string;
@@ -26,16 +27,6 @@ function formatTime(sec: number) {
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${m}:${r.toString().padStart(2, "0")}`;
-}
-
-function djb2Hash(str: string) {
-  let h = 5381;
-  for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
-  return (h >>> 0).toString(36);
-}
-
-function makeAudioSessionKey(userId: string, storyNode: string, src: string) {
-  return `cq:audio:v1:${userId}:${storyNode}:${djb2Hash(src)}`;
 }
 
 type AudioSessionState = {
@@ -69,6 +60,7 @@ function clearSession(key: string) {
 }
 
 export default function AudioPlayer({
+  audioKey,
   src,
   blob: _blob,
   title,
@@ -97,13 +89,14 @@ export default function AudioPlayer({
   const sessionKey = useMemo(() => {
     const id = user?.id;
     const storyNode = user?.storyNode;
-    if (!id || !storyNode || !src) return null;
-    return makeAudioSessionKey(id, storyNode, src);
-  }, [user?.id, user?.storyNode, src]);
+    if (!id || !storyNode || !audioKey) return null;
+    return `cq:audio:v1:${id}:${storyNode}:${audioKey}`;
+  }, [user?.id, user?.storyNode, audioKey]);
 
   const setAudioRef = useCallback((node: HTMLAudioElement | null) => {
     audioElRef.current = node;
     setAudioEl(node);
+
     if (node) {
       node.setAttribute("playsinline", "true");
       node.setAttribute("webkit-playsinline", "true");
@@ -141,15 +134,8 @@ export default function AudioPlayer({
     const el = audioElRef.current;
     if (!el) return;
 
-    try {
-      if (el.paused) {
-        await tryPlay(true);
-      } else {
-        el.pause();
-      }
-    } catch (e) {
-      console.error(e);
-    }
+    if (el.paused) await tryPlay(true);
+    else el.pause();
   }
 
   function seekBy(delta: number) {
@@ -276,7 +262,6 @@ export default function AudioPlayer({
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("pageshow", onPageShow);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionKey]);
 
   const sliderMax = useMemo(() => duration || 0, [duration]);
@@ -301,10 +286,7 @@ export default function AudioPlayer({
       )}
 
       {needsTapToResume ? (
-        <button
-          onClick={() => void tryPlay(true)}
-          style={{ height: 44, borderRadius: 10, fontWeight: 600 }}
-        >
+        <button onClick={() => void tryPlay(true)} style={{ height: 44, borderRadius: 10, fontWeight: 600 }}>
           Tap to resume audio
         </button>
       ) : null}

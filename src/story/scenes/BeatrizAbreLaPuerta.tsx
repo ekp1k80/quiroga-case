@@ -46,6 +46,7 @@ export default function BeatrizAbreLaPuertaScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="beatriz_puerta"
           />
         </ViewportWrapper>
       )}

@@ -46,6 +46,7 @@ export default function PrologueRestauranteScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="prologo_restaurante"
           />
         </ViewportWrapper>
       )}

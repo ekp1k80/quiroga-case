@@ -46,6 +46,7 @@ export default function HectorLaCamaraScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="hector_la_camara"
           />
         </ViewportWrapper>
       )}

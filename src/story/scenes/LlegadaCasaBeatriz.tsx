@@ -46,6 +46,7 @@ export default function LlegadaCasaBeatrizScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="llegada_casa_beatriz"
           />
         </ViewportWrapper>
       )}

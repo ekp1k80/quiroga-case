@@ -46,6 +46,7 @@ export default function HectorSofiaScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="hector_sofia"
           />
         </ViewportWrapper>
       )}

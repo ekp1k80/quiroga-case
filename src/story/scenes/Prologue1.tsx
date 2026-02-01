@@ -42,6 +42,7 @@ export default function PrologueScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="prologo_1"
           />
         </ViewportWrapper>
       )}

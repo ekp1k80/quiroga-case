@@ -46,6 +46,7 @@ export default function HectorLaCasaScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="hector_la_casa"
           />
         </ViewportWrapper>
       )}

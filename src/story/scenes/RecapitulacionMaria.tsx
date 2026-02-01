@@ -46,6 +46,7 @@ export default function RecapitulacionScene({ onDone, audio }: Props) {
             autoPlay
             barCount={50}
             onEnded={onDone}
+            audioKey="recapitulacion_maria"
           />
         </ViewportWrapper>
       )}

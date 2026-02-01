@@ -165,6 +165,7 @@ export default function LlamadaMamaHectorScene({
 						autoPlay
 						barCount={50}
 						onEnded={onDone}
+            audioKey="llamada_mama_hector"
 					/>
 				</ViewportWrapper>
 			)}
