@@ -3,10 +3,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AudioMeter, { type AudioMeterHandle } from "./AudioMeter";
 import { AudioVizConfig } from "@/data/packs";
+import { useUserState } from "@/hooks/orchestrator/useUserState";
 
 type Props = {
-  src: string; // objectUrl
-  blob: Blob; // compat
+  src: string;
+  blob: Blob;
   title?: string;
   viz: AudioVizConfig;
   showControls?: boolean;
@@ -27,6 +28,46 @@ function formatTime(sec: number) {
   return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
+function djb2Hash(str: string) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h) ^ str.charCodeAt(i);
+  return (h >>> 0).toString(36);
+}
+
+function makeAudioSessionKey(userId: string, storyNode: string, src: string) {
+  return `cq:audio:v1:${userId}:${storyNode}:${djb2Hash(src)}`;
+}
+
+type AudioSessionState = {
+  t: number;
+  wasPlaying: boolean;
+  volume: number;
+  rate: number;
+  savedAt: number;
+};
+
+function loadSession(key: string): AudioSessionState | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as AudioSessionState;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(key: string, state: AudioSessionState) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(state));
+  } catch {}
+}
+
+function clearSession(key: string) {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {}
+}
+
 export default function AudioPlayer({
   src,
   blob: _blob,
@@ -37,6 +78,8 @@ export default function AudioPlayer({
   onEnded,
   barCount,
 }: Props) {
+  const { user } = useUserState();
+
   const meterRef = useRef<AudioMeterHandle>(null);
 
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
@@ -51,16 +94,72 @@ export default function AudioPlayer({
 
   const [needsTapToResume, setNeedsTapToResume] = useState(false);
 
+  const sessionKey = useMemo(() => {
+    const id = user?.id;
+    const storyNode = user?.storyNode;
+    if (!id || !storyNode || !src) return null;
+    return makeAudioSessionKey(id, storyNode, src);
+  }, [user?.id, user?.storyNode, src]);
+
   const setAudioRef = useCallback((node: HTMLAudioElement | null) => {
     audioElRef.current = node;
     setAudioEl(node);
-
     if (node) {
-      // iOS/Safari hints
       node.setAttribute("playsinline", "true");
       node.setAttribute("webkit-playsinline", "true");
     }
   }, []);
+
+  async function safeResumeMeter() {
+    try {
+      await meterRef.current?.resume();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function tryPlay(fromUserGesture: boolean) {
+    const el = audioElRef.current;
+    if (!el) return;
+
+    try {
+      await safeResumeMeter();
+
+      if (lastTimeRef.current > 0 && Math.abs(el.currentTime - lastTimeRef.current) > 0.25) {
+        el.currentTime = lastTimeRef.current;
+      }
+
+      await el.play();
+      setNeedsTapToResume(false);
+    } catch (e) {
+      console.error(e);
+      if (!fromUserGesture) setNeedsTapToResume(true);
+    }
+  }
+
+  async function togglePlay() {
+    const el = audioElRef.current;
+    if (!el) return;
+
+    try {
+      if (el.paused) {
+        await tryPlay(true);
+      } else {
+        el.pause();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function seekBy(delta: number) {
+    const el = audioElRef.current;
+    if (!el) return;
+    const next = clamp(el.currentTime + delta, 0, el.duration || Infinity);
+    el.currentTime = next;
+    lastTimeRef.current = next;
+    setCurrent(next);
+  }
 
   useEffect(() => {
     const el = audioElRef.current;
@@ -85,6 +184,7 @@ export default function AudioPlayer({
       setIsPlaying(false);
       wasPlayingRef.current = false;
       setNeedsTapToResume(false);
+      if (sessionKey) clearSession(sessionKey);
       onEnded?.();
     };
 
@@ -101,109 +201,83 @@ export default function AudioPlayer({
       el.removeEventListener("pause", onPause);
       el.removeEventListener("ended", onEndedInternal);
     };
-  }, [src, onEnded]);
+  }, [src, onEnded, sessionKey]);
 
-  async function safeResumeMeter() {
-    try {
-      await meterRef.current?.resume();
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  async function tryPlay(fromUserGesture: boolean) {
-    const el = audioElRef.current;
-    if (!el) return;
-
-    try {
-      await safeResumeMeter();
-
-      // si el SO lo cortó, re-seteamos el tiempo guardado para evitar "reinicio"
-      if (lastTimeRef.current > 0 && Math.abs(el.currentTime - lastTimeRef.current) > 0.25) {
-        el.currentTime = lastTimeRef.current;
-      }
-
-      await el.play();
-      setNeedsTapToResume(false);
-    } catch (e) {
-      console.error(e);
-      // en iOS muchas veces solo permite play si viene de un gesto
-      if (!fromUserGesture) setNeedsTapToResume(true);
-    }
-  }
-
-  async function togglePlay() {
-    const el = audioElRef.current;
-    if (!el) return;
-
-    if (el.paused) {
-      await tryPlay(true);
-    } else {
-      el.pause();
-    }
-  }
-
-  function seekBy(delta: number) {
-    const el = audioElRef.current;
-    if (!el) return;
-    const next = clamp(el.currentTime + delta, 0, el.duration || Infinity);
-    el.currentTime = next;
-    lastTimeRef.current = next;
-    setCurrent(next);
-  }
-
-  // AutoPlay: solo si el browser lo permite (si no, cae al botón “Tap to resume”)
   useEffect(() => {
     if (!autoPlay) return;
     void tryPlay(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoPlay, src, audioEl]);
 
-  // Guardar estado al bloquear / ocultar y reanudar al volver
   useEffect(() => {
-    const saveState = () => {
+    if (!sessionKey) return;
+
+    const save = () => {
       const el = audioElRef.current;
       if (!el) return;
-      lastTimeRef.current = el.currentTime || 0;
-      wasPlayingRef.current = !el.paused && !el.ended;
+
+      saveSession(sessionKey, {
+        t: el.currentTime || 0,
+        wasPlaying: !el.paused && !el.ended,
+        volume: el.volume,
+        rate: el.playbackRate,
+        savedAt: Date.now(),
+      });
     };
 
-    const restoreState = async () => {
+    const restore = () => {
       const el = audioElRef.current;
       if (!el) return;
 
-      // restaurar tiempo para evitar volver al inicio
-      if (lastTimeRef.current > 0 && Math.abs(el.currentTime - lastTimeRef.current) > 0.25) {
-        el.currentTime = lastTimeRef.current;
+      const st = loadSession(sessionKey);
+      if (!st) return;
+
+      const apply = () => {
+        try {
+          const t = Number.isFinite(st.t) ? st.t : 0;
+          el.currentTime = t;
+          el.volume = typeof st.volume === "number" ? st.volume : el.volume;
+          el.playbackRate = typeof st.rate === "number" ? st.rate : el.playbackRate;
+          lastTimeRef.current = t;
+          setCurrent(t);
+        } catch {}
+      };
+
+      if (Number.isFinite(el.duration) && el.duration > 0) {
+        apply();
+      } else {
+        const onMeta = () => {
+          apply();
+          el.removeEventListener("loadedmetadata", onMeta);
+        };
+        el.addEventListener("loadedmetadata", onMeta);
       }
 
-      // si estaba reproduciendo antes, intentamos seguir
-      if (wasPlayingRef.current) {
-        await tryPlay(false);
-      } else {
-        // aunque no estuviera, el meter a veces queda suspendido
-        await safeResumeMeter();
-      }
+      if (st.wasPlaying) void tryPlay(false);
+      else void safeResumeMeter();
     };
 
     const onVisibility = () => {
-      if (document.hidden) saveState();
-      else void restoreState();
+      if (document.hidden) save();
+      else restore();
     };
 
-    const onPageHide = () => saveState();
-    const onPageShow = () => void restoreState();
+    const onPageHide = () => save();
+    const onPageShow = () => restore();
 
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
+
+    restore();
 
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("pageshow", onPageShow);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey]);
 
   const sliderMax = useMemo(() => duration || 0, [duration]);
   const sliderVal = useMemo(() => Math.min(current, duration || 0), [current, duration]);
@@ -212,12 +286,7 @@ export default function AudioPlayer({
     <div style={{ display: "grid", gap: 10, padding: 1, borderRadius: 12 }}>
       {title ? <div style={{ fontWeight: 600 }}>{title}</div> : null}
 
-      <audio
-        ref={setAudioRef}
-        src={src}
-        preload="auto"
-        playsInline
-      />
+      <audio ref={setAudioRef} src={src} preload="auto" playsInline />
 
       {showControls && (
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -234,11 +303,7 @@ export default function AudioPlayer({
       {needsTapToResume ? (
         <button
           onClick={() => void tryPlay(true)}
-          style={{
-            height: 44,
-            borderRadius: 10,
-            fontWeight: 600,
-          }}
+          style={{ height: 44, borderRadius: 10, fontWeight: 600 }}
         >
           Tap to resume audio
         </button>
