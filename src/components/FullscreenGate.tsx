@@ -1,4 +1,3 @@
-// src/components/FullscreenGate.tsx
 "use client";
 
 import React, { useCallback, useState } from "react";
@@ -11,6 +10,14 @@ type Props = {
   subtitle?: string;
   onReady: () => void;
 };
+
+async function requestWakeLock() {
+  try {
+    if (typeof navigator !== "undefined" && "wakeLock" in navigator) {
+      await navigator.wakeLock.request("screen");
+    }
+  } catch {}
+}
 
 export default function FullscreenGate({
   title = "Tap para continuar",
@@ -29,13 +36,15 @@ export default function FullscreenGate({
     setErr(null);
 
     try {
-      // enter puede fallar/no-op si ya estás fullscreen, no pasa nada.
       try {
         await enter();
       } catch {}
 
-      // esto SÍ necesita gesto del usuario
       await unlockNow();
+
+      if (process.env.NODE_ENV === "production") {
+        await requestWakeLock();
+      }
 
       onReady();
     } catch (e: any) {
