@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AudioMeter, { type AudioMeterHandle } from "./AudioMeter";
 import { AudioVizConfig } from "@/data/packs";
 
@@ -12,7 +12,7 @@ type Props = {
   showControls?: boolean;
   autoPlay?: boolean;
   onEnded?: () => void;
-	barCount?: number;
+  barCount?: number;
 };
 
 function clamp(n: number, min: number, max: number) {
@@ -35,36 +35,56 @@ export default function AudioPlayer({
   showControls = true,
   autoPlay = false,
   onEnded,
-	barCount,
+  barCount,
 }: Props) {
-  const audioRef = useRef<HTMLAudioElement>(null);
   const meterRef = useRef<AudioMeterHandle>(null);
+
+  const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [current, setCurrent] = useState(0);
 
-  // ✅ clave: cuando el <audio> existe, forzamos render para pasar audioEl no-null al AudioMeter
-  const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
+  const lastTimeRef = useRef(0);
+  const wasPlayingRef = useRef(false);
 
-  useEffect(() => {
-    // En cuanto el ref se setea (post-mount), guardamos el elemento en estado
-    if (audioRef.current && audioEl !== audioRef.current) {
-      setAudioEl(audioRef.current);
+  const [needsTapToResume, setNeedsTapToResume] = useState(false);
+
+  const setAudioRef = useCallback((node: HTMLAudioElement | null) => {
+    audioElRef.current = node;
+    setAudioEl(node);
+
+    if (node) {
+      // iOS/Safari hints
+      node.setAttribute("playsinline", "true");
+      node.setAttribute("webkit-playsinline", "true");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audioRef.current]); // sí, esto funciona en la práctica: dispara al mount
+  }, []);
 
   useEffect(() => {
-    const el = audioRef.current;
+    const el = audioElRef.current;
     if (!el) return;
 
     const onLoaded = () => setDuration(el.duration || 0);
-    const onTime = () => setCurrent(el.currentTime || 0);
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
+    const onTime = () => {
+      const t = el.currentTime || 0;
+      setCurrent(t);
+      lastTimeRef.current = t;
+    };
+    const onPlay = () => {
+      setIsPlaying(true);
+      wasPlayingRef.current = true;
+      setNeedsTapToResume(false);
+    };
+    const onPause = () => {
+      setIsPlaying(false);
+      wasPlayingRef.current = false;
+    };
     const onEndedInternal = () => {
       setIsPlaying(false);
+      wasPlayingRef.current = false;
+      setNeedsTapToResume(false);
       onEnded?.();
     };
 
@@ -85,59 +105,105 @@ export default function AudioPlayer({
 
   async function safeResumeMeter() {
     try {
-      // Si audioEl todavía es null, no hay graph posible
-      if (!audioRef.current) return;
       await meterRef.current?.resume();
     } catch (e) {
       console.error(e);
     }
   }
 
-  async function togglePlay() {
-    const el = audioRef.current;
+  async function tryPlay(fromUserGesture: boolean) {
+    const el = audioElRef.current;
     if (!el) return;
 
     try {
-      if (el.paused) {
-        await safeResumeMeter();
-        await el.play();
-      } else {
-        el.pause();
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  async function runAutoPlay() {
-    const el = audioRef.current;
-    if (!el) return;
-
-    try {
-      // ✅ MUY importante: asegurar que AudioMeter ya recibió audioEl no-null
-      // Esperamos al próximo tick si todavía no se actualizó el state.
-      if (!audioEl) {
-        await new Promise<void>((r) => setTimeout(() => r(), 0));
-      }
-
       await safeResumeMeter();
+
+      // si el SO lo cortó, re-seteamos el tiempo guardado para evitar "reinicio"
+      if (lastTimeRef.current > 0 && Math.abs(el.currentTime - lastTimeRef.current) > 0.25) {
+        el.currentTime = lastTimeRef.current;
+      }
+
       await el.play();
+      setNeedsTapToResume(false);
     } catch (e) {
       console.error(e);
+      // en iOS muchas veces solo permite play si viene de un gesto
+      if (!fromUserGesture) setNeedsTapToResume(true);
     }
   }
 
-  useEffect(() => {
-    if (!autoPlay) return;
-    void runAutoPlay();
-    // reintenta si cambia el src o cuando el audioEl se vuelva no-null
-  }, [autoPlay, src, audioEl]);
+  async function togglePlay() {
+    const el = audioElRef.current;
+    if (!el) return;
+
+    if (el.paused) {
+      await tryPlay(true);
+    } else {
+      el.pause();
+    }
+  }
 
   function seekBy(delta: number) {
-    const el = audioRef.current;
+    const el = audioElRef.current;
     if (!el) return;
-    el.currentTime = clamp(el.currentTime + delta, 0, el.duration || Infinity);
+    const next = clamp(el.currentTime + delta, 0, el.duration || Infinity);
+    el.currentTime = next;
+    lastTimeRef.current = next;
+    setCurrent(next);
   }
+
+  // AutoPlay: solo si el browser lo permite (si no, cae al botón “Tap to resume”)
+  useEffect(() => {
+    if (!autoPlay) return;
+    void tryPlay(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlay, src, audioEl]);
+
+  // Guardar estado al bloquear / ocultar y reanudar al volver
+  useEffect(() => {
+    const saveState = () => {
+      const el = audioElRef.current;
+      if (!el) return;
+      lastTimeRef.current = el.currentTime || 0;
+      wasPlayingRef.current = !el.paused && !el.ended;
+    };
+
+    const restoreState = async () => {
+      const el = audioElRef.current;
+      if (!el) return;
+
+      // restaurar tiempo para evitar volver al inicio
+      if (lastTimeRef.current > 0 && Math.abs(el.currentTime - lastTimeRef.current) > 0.25) {
+        el.currentTime = lastTimeRef.current;
+      }
+
+      // si estaba reproduciendo antes, intentamos seguir
+      if (wasPlayingRef.current) {
+        await tryPlay(false);
+      } else {
+        // aunque no estuviera, el meter a veces queda suspendido
+        await safeResumeMeter();
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) saveState();
+      else void restoreState();
+    };
+
+    const onPageHide = () => saveState();
+    const onPageShow = () => void restoreState();
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("pageshow", onPageShow);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, []);
 
   const sliderMax = useMemo(() => duration || 0, [duration]);
   const sliderVal = useMemo(() => Math.min(current, duration || 0), [current, duration]);
@@ -146,7 +212,12 @@ export default function AudioPlayer({
     <div style={{ display: "grid", gap: 10, padding: 1, borderRadius: 12 }}>
       {title ? <div style={{ fontWeight: 600 }}>{title}</div> : null}
 
-      <audio ref={audioRef} src={src} preload="metadata" />
+      <audio
+        ref={setAudioRef}
+        src={src}
+        preload="auto"
+        playsInline
+      />
 
       {showControls && (
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -160,7 +231,19 @@ export default function AudioPlayer({
         </div>
       )}
 
-      {/* ✅ Solo renderizamos el meter cuando audioEl ya existe */}
+      {needsTapToResume ? (
+        <button
+          onClick={() => void tryPlay(true)}
+          style={{
+            height: 44,
+            borderRadius: 10,
+            fontWeight: 600,
+          }}
+        >
+          Tap to resume audio
+        </button>
+      ) : null}
+
       {audioEl ? (
         <AudioMeter barCount={barCount} ref={meterRef} audioEl={audioEl} viz={viz} />
       ) : (
@@ -175,9 +258,12 @@ export default function AudioPlayer({
           step={0.01}
           value={sliderVal}
           onChange={(e) => {
-            const el = audioRef.current;
+            const el = audioElRef.current;
             if (!el) return;
-            el.currentTime = Number(e.target.value);
+            const t = Number(e.target.value);
+            el.currentTime = t;
+            lastTimeRef.current = t;
+            setCurrent(t);
           }}
           style={{ width: "100%" }}
         />
