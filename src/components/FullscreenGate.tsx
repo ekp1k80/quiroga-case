@@ -31,7 +31,7 @@ export default function FullscreenGate({
     try {
       // enter puede fallar/no-op si ya estás fullscreen, no pasa nada.
       try {
-        await enter();
+        // await enter();
       } catch {}
 
       // esto SÍ necesita gesto del usuario

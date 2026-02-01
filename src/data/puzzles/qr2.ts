@@ -134,18 +134,11 @@ export const QR2_FLOW: PuzzleFlow = {
     },
 
     {
-      prompt: "V. ACTUACIONES\nFigura legal:",
+      prompt: "V. ACTUACIONES\nOrganismo que recibe la denuncia:",
       check: nonEmpty,
       okMessages: ["Ok."],
       badMessages: ["Escribí la figura legal."],
       effectsOnDone: { saveField: "qr2.judicial.figura" },
-    },
-    {
-      prompt: "Organismo que recibe la denuncia:",
-      check: nonEmpty,
-      okMessages: ["Ok."],
-      badMessages: ["Escribí el organismo."],
-      effectsOnDone: { saveField: "qr2.judicial.organismo" },
     },
     {
       prompt: "Medidas iniciales solicitadas:",

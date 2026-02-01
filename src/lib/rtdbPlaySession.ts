@@ -1,6 +1,16 @@
 // src/lib/rtdbPlaySession.ts
 import { rtdb } from "@/lib/firebaseAdmin";
+import { randomInt } from "crypto";
 
+function shuffleInPlace<T>(arr: T[]) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
+}
 /**
  * RTDB schema (mínimo, final):
  *
@@ -200,6 +210,16 @@ function computeGroupSizesGeneral(n: number, groupSize: number, minSize = 3) {
 
 type PlayerRow = { userId: string; name: string; joinedAt: number };
 
+function computeBalancedSizes(n: number, g: number) {
+  if (g <= 0) return [];
+  const base = Math.floor(n / g);
+  const r = n % g;
+
+  const sizes = Array.from({ length: g }, () => base);
+  for (let i = 0; i < r; i++) sizes[i] = base + 1;
+  return sizes;
+}
+
 function buildGroupsFromPlayers(opts: {
   players: PlayerRow[];
   groupSize: number;
@@ -214,7 +234,10 @@ function buildGroupsFromPlayers(opts: {
 
   const playerIdsOrdered = players
     .slice()
-    .sort((a, b) => (a.joinedAt ?? 0) - (b.joinedAt ?? 0))
+    .sort((a, b) =>
+      (a.joinedAt ?? 0) - (b.joinedAt ?? 0) ||
+      a.userId.localeCompare(b.userId)
+    )
     .map((p) => p.userId);
 
   const fixed = fixedByUserId ?? {};
@@ -233,47 +256,62 @@ function buildGroupsFromPlayers(opts: {
     .map(([groupNum, userIds]) => ({ groupNum, userIds }))
     .filter((c) => c.userIds.length > 0);
 
-  for (const c of clusters) {
-    if (c.userIds.length > groupSize) {
-      throw new Error(formatGroupErr(`el grupo fijo #${c.groupNum} tiene ${c.userIds.length} personas y excede el tamaño ${groupSize}`));
-    }
-  }
-
   const clusterCount = clusters.length;
 
-  const minG = Math.ceil(n / groupSize);
   const maxG = Math.floor(n / 3);
-  const startG = Math.max(minG, clusterCount);
+  if (maxG < 1) throw new Error(formatGroupErr("mínimo 3 jugadores"));
 
-  let g = -1;
+  const startG = Math.max(1, clusterCount);
+
+  let bestG = -1;
+  let bestScore = Number.POSITIVE_INFINITY;
+
   for (let cand = startG; cand <= maxG; cand++) {
-    if (n <= groupSize * cand) {
-      g = cand;
-      break;
+    const minSize = Math.floor(n / cand);
+    const maxSize = Math.ceil(n / cand);
+    if (minSize < 3) break;
+
+    let ok = true;
+    for (const c of clusters) {
+      if (c.userIds.length > maxSize) {
+        ok = false;
+        break;
+      }
+    }
+    if (!ok) continue;
+
+    const sizes = computeBalancedSizes(n, cand);
+    const score =
+      sizes.reduce((acc, sz) => acc + Math.abs(sz - groupSize), 0) +
+      Math.abs(cand - Math.round(n / groupSize)) * 0.25;
+
+    if (score < bestScore) {
+      bestScore = score;
+      bestG = cand;
     }
   }
-  if (g === -1) {
-    throw new Error(formatGroupErr("no existe partición válida (revisá tamaño de grupo o cantidad de grupos fijos)"));
+
+  if (bestG === -1) {
+    throw new Error(formatGroupErr("no existe partición válida (revisá tamaño de grupo o clusters)"));
   }
 
-  const sizes = computeGroupSizesGeneral(n, groupSize, 3);
-  if (!sizes.length) throw new Error(formatGroupErr("no se pudieron calcular tamaños de grupos"));
+  const clusteredSet = new Set<string>();
+  for (const c of clusters) for (const uid of c.userIds) clusteredSet.add(uid);
 
-  if (sizes.length !== g) {
-    const sizes2 = Array.from({ length: g }, () => 3);
-    let rest = n - 3 * g;
-    for (let i = 0; i < rest; i++) sizes2[i % g]++;
-    for (const sz of sizes2) if (sz > groupSize) throw new Error(formatGroupErr("no se pudo distribuir respetando el tamaño máximo"));
-    return finalizeGrouping(playerIdsOrdered, clusters, sizes2);
-  }
+  const freeIds = playerIdsOrdered.filter((uid) => !clusteredSet.has(uid));
+  shuffleInPlace(freeIds);
 
-  return finalizeGrouping(playerIdsOrdered, clusters, sizes);
+  const sizes = computeBalancedSizes(n, bestG);
+
+  const shuffleInsideGroup = true;
+  return finalizeGroupingRandom(clusters, freeIds, sizes, shuffleInsideGroup);
 }
 
-function finalizeGrouping(
-  playerIdsOrdered: string[],
+function finalizeGroupingRandom(
   clusters: Array<{ groupNum: number; userIds: string[] }>,
-  sizes: number[]
+  freeIdsShuffled: string[],
+  sizes: number[],
+  shuffleInsideGroup: boolean
 ) {
   const groupSlots = sizes.map((target, i) => ({
     idx: i + 1,
@@ -283,55 +321,53 @@ function finalizeGrouping(
 
   const used = new Set<string>();
 
-  const clustersSorted = clusters
-    .slice()
-    .sort((a, b) => (b.userIds.length - a.userIds.length) || (a.groupNum - b.groupNum));
+  const clustersShuffled = clusters.slice();
+  shuffleInPlace(clustersShuffled);
 
-  for (const c of clustersSorted) {
-    let bestIndex = -1;
-    let bestRemaining = -1;
-
+  for (const c of clustersShuffled) {
+    const candidates: number[] = [];
     for (let i = 0; i < groupSlots.length; i++) {
       const g = groupSlots[i];
       const remaining = g.target - g.playerIds.length;
-      if (remaining >= c.userIds.length) {
-        if (remaining > bestRemaining) {
-          bestRemaining = remaining;
-          bestIndex = i;
-        }
-      }
+      if (remaining >= c.userIds.length) candidates.push(i);
     }
 
-    if (bestIndex === -1) {
+    if (!candidates.length) {
       throw new Error(formatGroupErr(`no hay lugar para el grupo fijo #${c.groupNum}`));
     }
 
-    const targetGroup = groupSlots[bestIndex];
-    for (const uid of c.userIds) {
+    const pick = candidates[randomInt(candidates.length)];
+    const targetGroup = groupSlots[pick];
+
+    const ids = c.userIds.slice();
+    if (shuffleInsideGroup) shuffleInPlace(ids);
+
+    for (const uid of ids) {
       if (used.has(uid)) continue;
       targetGroup.playerIds.push(uid);
       used.add(uid);
     }
   }
 
-  const remainingPlayers = playerIdsOrdered.filter((uid) => !used.has(uid));
-
   let cursor = 0;
   for (const g of groupSlots) {
-    while (g.playerIds.length < g.target && cursor < remainingPlayers.length) {
-      g.playerIds.push(remainingPlayers[cursor]);
-      used.add(remainingPlayers[cursor]);
-      cursor++;
+    while (g.playerIds.length < g.target && cursor < freeIdsShuffled.length) {
+      const uid = freeIdsShuffled[cursor++];
+      if (used.has(uid)) continue;
+      g.playerIds.push(uid);
+      used.add(uid);
     }
   }
 
-  const leftover = remainingPlayers.slice(cursor);
-  if (leftover.length) {
-    throw new Error(formatGroupErr("sobraron jugadores sin asignar (bug de distribución)"));
+  const expected = sizes.reduce((a, b) => a + b, 0);
+  if (used.size !== expected) {
+    throw new Error(formatGroupErr("no se asignaron todos los jugadores"));
   }
 
-  if (used.size !== playerIdsOrdered.length) {
-    throw new Error(formatGroupErr("no se asignaron todos los jugadores (bug de consistencia)"));
+  if (shuffleInsideGroup) {
+    for (const g of groupSlots) {
+      shuffleInPlace(g.playerIds);
+    }
   }
 
   const groupsObj: Record<string, { idx: number; playerIds: string[] }> = {};

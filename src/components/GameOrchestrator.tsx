@@ -25,6 +25,7 @@ import PlaySessionLobby from "./PlaySessionLobby";
 import FinalPuzzleOrchestrator from "./FinalPuzzleOrchestrator";
 import { useRtdbValue } from "@/hooks/useRtdbValue";
 import { useQr3RoleFromState } from "@/hooks/useQr3RoleFromState";
+import PlaySessionGroupFormation from "./PlaySessionGroupFormation";
 
 type Tab = "chat" | "files" | "qr";
 

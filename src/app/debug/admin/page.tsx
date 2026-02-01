@@ -26,7 +26,7 @@ export default function DebugAdminPage() {
   const normalizedCode = codeInput.trim().toUpperCase();
 
   const { value: state, error } = useRtdbValue<PlaySessionState>(
-    playSessionId ? `playSessions/${playSessionId}` : ""
+    playSessionId ? `playSessions/${playSessionId}` : null
   );
 
   const players = useMemo(() => {
