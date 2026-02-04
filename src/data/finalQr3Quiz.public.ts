@@ -4,7 +4,7 @@ export type QQuestionPublic = { id: string; text: string; choices: QChoice[] };
 
 export const QR3_PASS_SCORE = 10;
 
-const DEBUG = true;
+const DEBUG = false;
 
 export const QUESTIONS: QQuestionPublic[] = [
   // Bloque A — Casa de Héctor
