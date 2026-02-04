@@ -113,6 +113,11 @@ const SCENES: Record<string, SceneComponent> = {
     return <BeatrizAbreLaPuertaScene onDone={onDone} audio={assets["act4/beatriz_abre_la_puerta.mp3"]} />
   },
   
+  "martin-entra-habitacion-eduardo": ({ onDone, assets }) => {
+    console.log("assets", assets)
+    return <MartinEntraHabitacionEduardoScene onDone={onDone} audio={assets["act4/martin_entra_habitacion_eduardo.mp3"]} />
+  },
+  
   "hector-mom-final-call": ({ onDone, assets }) => {
     console.log("hector-mom-final-call assets", assets)
     return (

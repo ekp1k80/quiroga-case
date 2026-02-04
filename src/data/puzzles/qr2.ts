@@ -25,7 +25,7 @@ export const QR2_FLOW: PuzzleFlow = {
       ],
       choices: [
         { id: "ready", label: "Estoy listo" },
-        { id: "whatIsReady", label: "Que es estar listo?" },
+        { id: "whatisready", label: "Que es estar listo?" },
       ],
       choiceReplies: {
         ready: {
@@ -34,7 +34,7 @@ export const QR2_FLOW: PuzzleFlow = {
           ],
           advance: true,
         },
-        whatIsReady: {
+        whatisready: {
           messages: [
             "Capo o capa, podes leer los archivos por favor...",
           ],
