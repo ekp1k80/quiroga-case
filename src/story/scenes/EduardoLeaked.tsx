@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import ViewportWrapper from "@/components/ViewportWrapper";
 import AudioPlayer from "@/components/AudioPlayer";
 import type { AudioVizConfig } from "@/data/packs";
 import { styled } from "styled-components";
+import AndroidLocked from "@/components/AndroidLocked";
 
-type Scene = "start" | "audio1" | "audio2" | "done";
+type Scene = "start" | "audio1" | "pause" | "audio2" | "done";
 
 const viz = {
 	gain: 1.6,
@@ -53,11 +54,14 @@ export default function EduardoLeakedScene({
 						barCount={50}
 						audioKey="eduardo_leaked_1"
 						onEnded={() => {
-							setScene("audio2");
+							setScene("pause");
 						}}
 					/>
 				</ViewportWrapper>
 			)}
+
+	  	{scene === "pause" && <AndroidLocked black fixedTime="" timerEnd={2000} onEnd={() => setScene("audio2")} />}
+
       {scene === "audio2" && (
 				<ViewportWrapper
 					fixedTime="13:38"
