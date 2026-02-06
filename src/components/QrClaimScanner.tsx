@@ -14,7 +14,7 @@ export default function QrClaimScanner({
 
   const { claim, loading } = useQrClaim({
     onSuccess: (res) => { setErr(null); onClaimed?.(res); },
-    onError: (res) => { setErr(res.error ?? "Error"); },
+    onError: (res) => { setErr(res.error ?? "Error"); alert(res.error) },
   });
 
   return (

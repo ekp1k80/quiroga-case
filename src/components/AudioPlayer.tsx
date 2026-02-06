@@ -5,6 +5,35 @@ import AudioMeter, { type AudioMeterHandle } from "./AudioMeter";
 import { AudioVizConfig } from "@/data/packs";
 import { useUserState } from "@/hooks/orchestrator/useUserState";
 
+function IconPlay() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  );
+}
+function IconPause() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M6 5h4v14H6zm8 0h4v14h-4z" />
+    </svg>
+  );
+}
+function IconBack() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M11 19V5l-9 7zM13 5h2v14h-2z" />
+    </svg>
+  );
+}
+function IconFwd() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M13 5v14l9-7zM9 5h2v14H9z" />
+    </svg>
+  );
+}
+
 type Props = {
   audioKey?: string;
   src: string;
@@ -274,16 +303,101 @@ export default function AudioPlayer({
       <audio ref={setAudioRef} src={src} preload="auto" playsInline />
 
       {showControls && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button onClick={() => seekBy(-10)}>-10</button>
-          <button onClick={togglePlay}>{isPlaying ? "Pause" : "Play"}</button>
-          <button onClick={() => seekBy(10)}>+10</button>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            padding: 10,
+            borderRadius: 14,
+            border: "1px solid rgba(255,255,255,0.10)",
+            background: "rgba(255,255,255,0.06)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => seekBy(-10)}
+            aria-label="Retroceder 10 segundos"
+            style={{
+              height: 38,
+              padding: "0 12px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.14)",
+              background: "rgba(0,0,0,0.18)",
+              color: "rgba(255,255,255,0.92)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+              fontWeight: 800,
+            }}
+          >
+            <IconBack />
+            <span style={{ fontSize: 12, opacity: 0.9 }}>10</span>
+          </button>
 
-          <div style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>
+          <button
+            type="button"
+            onClick={togglePlay}
+            aria-label={isPlaying ? "Pausar" : "Reproducir"}
+            style={{
+              height: 38,
+              padding: "0 14px",
+              borderRadius: 999,
+              border: "1px solid rgba(140,255,180,0.45)",
+              background: "rgba(140,255,180,0.18)",
+              color: "rgba(255,255,255,0.98)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+              fontWeight: 900,
+            }}
+          >
+            {isPlaying ? <IconPause /> : <IconPlay />}
+            <span style={{ fontSize: 12, letterSpacing: 0.2 }}>{isPlaying ? "Pause" : "Play"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => seekBy(10)}
+            aria-label="Avanzar 10 segundos"
+            style={{
+              height: 38,
+              padding: "0 12px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.14)",
+              background: "rgba(0,0,0,0.18)",
+              color: "rgba(255,255,255,0.92)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              cursor: "pointer",
+              fontWeight: 800,
+            }}
+          >
+            <span style={{ fontSize: 12, opacity: 0.9 }}>10</span>
+            <IconFwd />
+          </button>
+
+          <div
+            style={{
+              marginLeft: "auto",
+              fontVariantNumeric: "tabular-nums",
+              fontSize: 12,
+              opacity: 0.85,
+              padding: "6px 10px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.10)",
+              background: "rgba(0,0,0,0.18)",
+              whiteSpace: "nowrap",
+            }}
+          >
             {formatTime(current)} / {formatTime(duration)}
           </div>
         </div>
       )}
+
 
       {needsTapToResume ? (
         <button onClick={() => void tryPlay(true)} style={{ height: 44, borderRadius: 10, fontWeight: 600 }}>
