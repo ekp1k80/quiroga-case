@@ -44,6 +44,25 @@ export const THE_RADIO_CHAT_FLOW: PuzzleFlow = {
       check: () => true,
       okMessages: [],
       badMessages: ["Elegí una opción."],
+    },
+    {
+      prompt: [
+        "Te paras unos momentos...",
+      ],
+      choices: [
+        { id: "listen", label: "Escuchar la radio" },
+      ],
+      choiceReplies: {
+        listen: {
+          messages: [
+            "...",
+          ],
+          advance: true,
+        },
+      },
+      check: () => true,
+      okMessages: [],
+      badMessages: ["Elegí una opción."],
     }
   ],
 };
