@@ -141,57 +141,49 @@ export default function GameChatConsole({
     if (typeof window === "undefined") return;
 
     const vv = window.visualViewport;
-    if (!vv) {
-      alert("visualViewport NO disponible");
-      return;
-    }
+    if (!vv) return;
 
-    let lastAlert = 0;
+    const baseInnerHeight = window.innerHeight;
+    let keyboardOpen = false;
 
     const update = () => {
-      const now = Date.now();
-      if (now - lastAlert < 300) return; // throttle alerts
-      lastAlert = now;
+      const inset = Math.max(0, baseInnerHeight - vv.height - vv.offsetTop);
 
-      const innerH = window.innerHeight;
-      const docH = document.documentElement.clientHeight;
+      // Detectamos APERTURA de teclado
+      if (!keyboardOpen && inset > 0) {
+        keyboardOpen = true;
 
-      const data = {
-        window_innerHeight: innerH,
-        document_clientHeight: docH,
-        visualViewport_height: vv.height,
-        visualViewport_offsetTop: vv.offsetTop,
-        visualViewport_scale: vv.scale,
-        calculated_inset: Math.max(0, innerH - vv.height - vv.offsetTop),
-      };
+        alert(
+          [
+            "📱 Keyboard OPEN detected",
+            "",
+            `window.innerHeight: ${window.innerHeight}`,
+            `baseInnerHeight: ${baseInnerHeight}`,
+            `document.clientHeight: ${document.documentElement.clientHeight}`,
+            `visualViewport.height: ${vv.height}`,
+            `visualViewport.offsetTop: ${vv.offsetTop}`,
+            `visualViewport.scale: ${vv.scale}`,
+            "",
+            `CALCULATED INSET: ${inset}`,
+          ].join("\n")
+        );
+      }
 
-      alert(
-        [
-          "📱 Keyboard / Viewport debug",
-          "",
-          `window.innerHeight: ${data.window_innerHeight}`,
-          `document.documentElement.clientHeight: ${data.document_clientHeight}`,
-          `visualViewport.height: ${data.visualViewport_height}`,
-          `visualViewport.offsetTop: ${data.visualViewport_offsetTop}`,
-          `visualViewport.scale: ${data.visualViewport_scale}`,
-          "",
-          `CALCULATED INSET: ${data.calculated_inset}`,
-        ].join("\n")
-      );
+      // Detectamos CIERRE de teclado (resetea flag)
+      if (keyboardOpen && inset === 0) {
+        keyboardOpen = false;
+      }
 
-      // setKeyboardInset(data.calculated_inset);
+      // ❌ no movemos nada todavía
+      // setKeyboardInset(inset);
     };
 
-    update();
-
     vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
     window.addEventListener("resize", update);
     window.addEventListener("orientationchange", update);
 
     return () => {
       vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
       window.removeEventListener("orientationchange", update);
     };
