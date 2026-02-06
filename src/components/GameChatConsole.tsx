@@ -33,6 +33,9 @@ type Props = {
 
   onSend: (rawText: string, normalizedText: string) => void;
 
+  onResetLocal?: () => void;
+  resetLabel?: string;
+
   clearKey?: string | number;
 
   // tuning
@@ -106,6 +109,8 @@ export default function GameChatConsole({
   prologueDelayMs = 1500,
   systemChainDelayMs = 1500,
   chainTypingMs = 520,
+  onResetLocal,
+  resetLabel = "Reiniciar chat",
 }: Props) {
   const [value, setValue] = useState("");
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -445,6 +450,18 @@ export default function GameChatConsole({
           {sending ? <StatusPill>Enviando…</StatusPill> : null}
           {showTypingBubble ? <StatusPill>…</StatusPill> : null}
           {disabled ? <StatusPill>Bloqueado</StatusPill> : null}
+          {onResetLocal ? (
+            <ResetBtn
+              type="button"
+              onClick={() => {
+                const ok = window.confirm("¿Reiniciar el chat local? Esto borra el historial guardado en este dispositivo.");
+                if (ok) onResetLocal();
+              }}
+              aria-label="Reiniciar chat local"
+            >
+              {resetLabel}
+            </ResetBtn>
+          ) : null}
         </HeaderRight>
       </Header>
 
@@ -776,4 +793,19 @@ const EmptyText = styled.div`
   font-size: 13px;
   text-align: center;
   max-width: 420px;
+`;
+
+const ResetBtn = styled.button`
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 120, 120, 0.22);
+  background: rgba(255, 120, 120, 0.10);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  font-weight: 900;
+
+  &:active {
+    transform: translateY(1px);
+  }
 `;

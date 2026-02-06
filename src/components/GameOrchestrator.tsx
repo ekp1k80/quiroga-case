@@ -304,6 +304,7 @@ export default function GameOrchestrator() {
         systemTyping={flow.systemTyping}
         disabled={flow.disabled}
         onSend={flow.send}
+        onResetLocal={flow.resetLocal}
       />
     );
   }

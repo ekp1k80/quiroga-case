@@ -74,7 +74,7 @@ export default function EduardoLeakedScene({
 						showControls={false}
 						autoPlay
 						barCount={50}
-            			onEnded={onDone}
+						onEnded={onDone}
 						audioKey="audio_leaked_2"
 					/>
 				</ViewportWrapper>

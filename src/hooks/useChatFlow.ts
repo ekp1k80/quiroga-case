@@ -110,6 +110,14 @@ function saveLS(key: string, data: PersistedChatState) {
   }
 }
 
+function removeLS(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
 export function useChatFlow(opts: UseChatFlowOptions) {
   const assets = useAssets();
 
@@ -397,6 +405,32 @@ export function useChatFlow(opts: UseChatFlowOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoInit, cacheKey, storageKey]);
 
+    const resetLocal = useCallback(async () => {
+      // 1) detener persistencia durante el reset (evita re-guardar estado viejo)
+      hydrationStateRef.current.readyToPersist = false;
+
+      // 2) limpiar caches
+      memoryCache.delete(cacheKey);
+      initInflight.delete(cacheKey);
+
+      // 3) limpiar localStorage
+      removeLS(storageKey);
+
+      // 4) resetear estado UI
+      setMessages([]);
+      setPersistedMessages([]);
+      setChoices([]);
+      setDone(false);
+      setSending(false);
+      setSystemTyping(false);
+
+      // 5) re-habilitar persistencia + re-init
+      hydrationStateRef.current.readyToPersist = true;
+      if (autoInit) {
+        await init();
+      }
+    }, [autoInit, cacheKey, storageKey, init]);
+
   /* ===================== send ===================== */
 
   const send = useCallback(
@@ -508,5 +542,6 @@ export function useChatFlow(opts: UseChatFlowOptions) {
     init,
     refresh,
     send,
+    resetLocal
   };
 }
