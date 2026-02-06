@@ -141,12 +141,45 @@ export default function GameChatConsole({
     if (typeof window === "undefined") return;
 
     const vv = window.visualViewport;
-    if (!vv) return;
+    if (!vv) {
+      alert("visualViewport NO disponible");
+      return;
+    }
+
+    let lastAlert = 0;
 
     const update = () => {
-      // layoutViewportHeight - visualViewportHeight - offsetTop (iOS suele usar offsetTop)
-      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      setKeyboardInset(inset);
+      const now = Date.now();
+      if (now - lastAlert < 300) return; // throttle alerts
+      lastAlert = now;
+
+      const innerH = window.innerHeight;
+      const docH = document.documentElement.clientHeight;
+
+      const data = {
+        window_innerHeight: innerH,
+        document_clientHeight: docH,
+        visualViewport_height: vv.height,
+        visualViewport_offsetTop: vv.offsetTop,
+        visualViewport_scale: vv.scale,
+        calculated_inset: Math.max(0, innerH - vv.height - vv.offsetTop),
+      };
+
+      alert(
+        [
+          "📱 Keyboard / Viewport debug",
+          "",
+          `window.innerHeight: ${data.window_innerHeight}`,
+          `document.documentElement.clientHeight: ${data.document_clientHeight}`,
+          `visualViewport.height: ${data.visualViewport_height}`,
+          `visualViewport.offsetTop: ${data.visualViewport_offsetTop}`,
+          `visualViewport.scale: ${data.visualViewport_scale}`,
+          "",
+          `CALCULATED INSET: ${data.calculated_inset}`,
+        ].join("\n")
+      );
+
+      // setKeyboardInset(data.calculated_inset);
     };
 
     update();
