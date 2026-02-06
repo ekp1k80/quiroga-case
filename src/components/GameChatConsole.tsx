@@ -132,8 +132,37 @@ export default function GameChatConsole({
   // typing "fake" durante reveals (para burbuja "...")
   const [revealTyping, setRevealTyping] = useState(false);
 
+  const [keyboardInset, setKeyboardInset] = useState(0);
+
   const lastPrologueKeyRef = useRef<string>("");
   const lastChainKeyRef = useRef<string>("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const update = () => {
+      // layoutViewportHeight - visualViewportHeight - offsetTop (iOS suele usar offsetTop)
+      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardInset(inset);
+    };
+
+    update();
+
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
+
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+    };
+  }, []);
 
   // Ajuste de visibleCount cuando cambia prologueActive (evita quedar clavado en 0)
   useEffect(() => {
@@ -298,7 +327,7 @@ export default function GameChatConsole({
 
   useEffect(() => {
     if (isRevealing) return;
-    inputRef.current?.focus();
+    // inputRef.current?.focus();
   }, [visibleMessages.length, isRevealing, systemTyping]);
 
   const submit = () => {
@@ -308,14 +337,14 @@ export default function GameChatConsole({
 
     onSend(raw, normalized);
     setValue("");
-    requestAnimationFrame(() => inputRef.current?.focus());
+    // requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const choose = (c: ChatChoice) => {
     if (!canChoose) return;
     onSend(c.label, c.id);
     setValue("");
-    requestAnimationFrame(() => inputRef.current?.focus());
+    // requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   const renderBubble = (m: ChatConsoleMessage) => {
@@ -395,7 +424,13 @@ export default function GameChatConsole({
         )}
       </Messages>
 
-      <Composer>
+      <Composer
+        style={{
+          transform: keyboardInset ? `translateY(-${keyboardInset}px)` : undefined,
+          paddingBottom: keyboardInset ? 10 + keyboardInset : undefined,
+          willChange: keyboardInset ? "transform" : undefined,
+        }}
+      >
         <ComposerRow>
           <Input
             ref={inputRef}
@@ -403,6 +438,11 @@ export default function GameChatConsole({
             onChange={(e) => setValue(e.target.value)}
             placeholder={inputPlaceholder}
             disabled={!!disabled || !!sending || showTypingBubble || isRevealing}
+            onFocus={() => {
+              requestAnimationFrame(() => {
+                inputRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              });
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -572,6 +612,10 @@ const Composer = styled.div`
   padding: 10px;
   display: grid;
   gap: 10px;
+
+  /* ayuda en mobile cuando cambia el viewport */
+  position: relative;
+  z-index: 5;
 `;
 
 const ComposerRow = styled.div`
