@@ -132,7 +132,8 @@ export default function GameChatConsole({
   // typing "fake" durante reveals (para burbuja "...")
   const [revealTyping, setRevealTyping] = useState(false);
 
-  const [keyboardInset, setKeyboardInset] = useState(0);
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  const [keyboardShift, setKeyboardShift] = useState(0);
 
   const lastPrologueKeyRef = useRef<string>("");
   const lastChainKeyRef = useRef<string>("");
@@ -143,51 +144,40 @@ export default function GameChatConsole({
     const vv = window.visualViewport;
     if (!vv) return;
 
-    const baseInnerHeight = window.innerHeight;
-    let keyboardOpen = false;
-
     const update = () => {
-      const inset = Math.max(0, baseInnerHeight - vv.height - vv.offsetTop);
+      const comp = composerRef.current;
+      if (!comp) return;
 
-      // Detectamos APERTURA de teclado
-      if (!keyboardOpen && inset > 0) {
-        keyboardOpen = true;
+      // “Top” del teclado = borde inferior del visual viewport
+      const keyboardTop = vv.offsetTop + vv.height;
 
-        alert(
-          [
-            "📱 Keyboard OPEN detected",
-            "",
-            `window.innerHeight: ${window.innerHeight}`,
-            `baseInnerHeight: ${baseInnerHeight}`,
-            `document.clientHeight: ${document.documentElement.clientHeight}`,
-            `visualViewport.height: ${vv.height}`,
-            `visualViewport.offsetTop: ${vv.offsetTop}`,
-            `visualViewport.scale: ${vv.scale}`,
-            "",
-            `CALCULATED INSET: ${inset}`,
-          ].join("\n")
-        );
-      }
+      // Dónde está el composer ahora mismo (post layout / dvh / etc.)
+      const rect = comp.getBoundingClientRect();
 
-      // Detectamos CIERRE de teclado (resetea flag)
-      if (keyboardOpen && inset === 0) {
-        keyboardOpen = false;
-      }
+      // Si el composer queda por debajo del keyboardTop, hay solapamiento.
+      const overlap = rect.bottom - keyboardTop;
 
-      // ❌ no movemos nada todavía
-      // setKeyboardInset(inset);
+      // Movemos SOLO lo necesario para que quede justo arriba.
+      const shift = Math.max(0, Math.ceil(overlap));
+
+      setKeyboardShift(shift);
     };
 
+    update();
+
     vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
     window.addEventListener("resize", update);
     window.addEventListener("orientationchange", update);
 
     return () => {
       vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
       window.removeEventListener("orientationchange", update);
     };
   }, []);
+
 
   // Ajuste de visibleCount cuando cambia prologueActive (evita quedar clavado en 0)
   useEffect(() => {
@@ -450,10 +440,10 @@ export default function GameChatConsole({
       </Messages>
 
       <Composer
+        ref={composerRef}
         style={{
-          transform: keyboardInset ? `translateY(-${keyboardInset}px)` : undefined,
-          paddingBottom: keyboardInset ? 10 + keyboardInset : undefined,
-          willChange: keyboardInset ? "transform" : undefined,
+          transform: keyboardShift ? `translateY(-${keyboardShift}px)` : undefined,
+          willChange: keyboardShift ? "transform" : undefined,
         }}
       >
         <ComposerRow>
