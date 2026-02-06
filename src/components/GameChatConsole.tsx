@@ -135,6 +135,11 @@ export default function GameChatConsole({
   const composerRef = useRef<HTMLDivElement | null>(null);
   const [keyboardShift, setKeyboardShift] = useState(0);
 
+  const baseComposerBottomRef = useRef<number | null>(null);
+  const keyboardOpenRef = useRef(false);
+  const rafRef = useRef<number | null>(null);
+
+
   const lastPrologueKeyRef = useRef<string>("");
   const lastChainKeyRef = useRef<string>("");
 
@@ -144,39 +149,84 @@ export default function GameChatConsole({
     const vv = window.visualViewport;
     if (!vv) return;
 
+    const stopRaf = () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    };
+
     const update = () => {
       const comp = composerRef.current;
       if (!comp) return;
 
-      // “Top” del teclado = borde inferior del visual viewport
+      const rect = comp.getBoundingClientRect();
       const keyboardTop = vv.offsetTop + vv.height;
 
-      // Dónde está el composer ahora mismo (post layout / dvh / etc.)
-      const rect = comp.getBoundingClientRect();
+      // Si no hay teclado (o volvió a normal), guardamos la base “real” (sin corrección)
+      // Nota: no dependemos de innerHeight; usamos el propio viewport visible.
+      const isKeyboardOpen = keyboardTop < window.innerHeight - 4;
 
-      // Si el composer queda por debajo del keyboardTop, hay solapamiento.
-      const overlap = rect.bottom - keyboardTop;
+      if (!isKeyboardOpen) {
+        keyboardOpenRef.current = false;
+        baseComposerBottomRef.current = rect.bottom;
+        setKeyboardShift(0);
+        stopRaf();
+        return;
+      }
 
-      // Movemos SOLO lo necesario para que quede justo arriba.
-      const shift = Math.max(0, Math.ceil(overlap));
+      keyboardOpenRef.current = true;
+
+      // BaseBottom: dónde quedaría el composer en condiciones normales (sin shift).
+      // Si por algún motivo no la tenemos, la tomamos ahora mismo (mejor que nada).
+      const baseBottom = baseComposerBottomRef.current ?? rect.bottom;
+
+      // Shift = cuánto hay que subir para que el bottom quede arriba del teclado.
+      // Le sumo un margen mínimo para que no quede “pegado”.
+      const margin = 8;
+      const shift = Math.max(0, Math.ceil(baseBottom - keyboardTop + margin));
 
       setKeyboardShift(shift);
     };
 
+    // iOS: al abrir teclado, durante unos frames cambian valores -> hacemos settle loop corto
+    const settle = (framesLeft: number) => {
+      update();
+      if (framesLeft <= 0) {
+        rafRef.current = null;
+        return;
+      }
+      rafRef.current = requestAnimationFrame(() => settle(framesLeft - 1));
+    };
+
+    const onViewportChange = () => {
+      // Cuando detectamos teclado abierto, corremos settle unos frames para evitar “flash”
+      const keyboardTop = vv.offsetTop + vv.height;
+      const isKeyboardOpen = keyboardTop < window.innerHeight - 4;
+
+      if (isKeyboardOpen) {
+        stopRaf();
+        settle(25); // ~25 frames ≈ 400ms @60hz
+      } else {
+        update();
+      }
+    };
+
+    // Inicial: setear base
     update();
 
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
-    window.addEventListener("resize", update);
-    window.addEventListener("orientationchange", update);
+    vv.addEventListener("resize", onViewportChange);
+    vv.addEventListener("scroll", onViewportChange);
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("orientationchange", onViewportChange);
 
     return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-      window.removeEventListener("orientationchange", update);
+      stopRaf();
+      vv.removeEventListener("resize", onViewportChange);
+      vv.removeEventListener("scroll", onViewportChange);
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("orientationchange", onViewportChange);
     };
   }, []);
+
 
 
   // Ajuste de visibleCount cuando cambia prologueActive (evita quedar clavado en 0)
