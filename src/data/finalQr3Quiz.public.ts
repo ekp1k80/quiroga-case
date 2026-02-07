@@ -2,7 +2,7 @@
 export type QChoice = { id: string; label: string };
 export type QQuestionPublic = { id: string; text: string; choices: QChoice[] };
 
-export const QR3_PASS_SCORE = 10;
+export const QR3_PASS_SCORE = 31;
 
 const DEBUG = false;
 
@@ -14,7 +14,7 @@ export const QUESTIONS: QQuestionPublic[] = [
     choices: [
       { id: "A", label: "Se llevaron electrodomésticos y ropa" },
       { id: "B", label: "Hay signos de pelea en todas las habitaciones" },
-      { id: "C", label: "Parece una búsqueda dirigida por material específico" },
+      { id: "C", label: "Hector fue secuestrado desde su casa" },
       { id: "D", label: "Hay marcas de incendio" },
     ],
   },
@@ -64,8 +64,8 @@ export const QUESTIONS: QQuestionPublic[] = [
     choices: [
       { id: "A", label: "Un ladrón al azar" },
       { id: "B", label: "La policía" },
-      { id: "C", label: "Eduardo (padre de Sofía)" },
-      { id: "D", label: "Beatriz (suegra)" },
+      { id: "C", label: "Eduardo" },
+      { id: "D", label: "Beatriz" },
     ],
   },
 
@@ -134,7 +134,7 @@ export const QUESTIONS: QQuestionPublic[] = [
   // Bloque D — Casa de Eduardo / board / ticket
   {
     id: "D1",
-    text: "¿Qué tipo de cosas conecta el board?",
+    text: "¿Qué tipo de cosas conecta la investigacion en la pared de Eduardo?",
     choices: [
       { id: "A", label: "Recetas de cocina" },
       { id: "B", label: "Personas + lugares + casos" },
@@ -164,7 +164,7 @@ export const QUESTIONS: QQuestionPublic[] = [
   },
   {
     id: "D4",
-    text: "¿Qué representa el board, en términos de estado mental?",
+    text: "¿Qué representa la investigacion de Eduardo, en términos de estado mental?",
     choices: [
       { id: "A", label: "Un hobby decorativo" },
       { id: "B", label: "Un trabajo sistemático/obsesivo de conexión de pistas" },
@@ -174,7 +174,7 @@ export const QUESTIONS: QQuestionPublic[] = [
   },
   {
     id: "D5",
-    text: "¿Qué tipo de evidencia suele acompañar este tipo de board?",
+    text: "¿Qué tipo de evidencia suele acompañar este tipo de Investigacion?",
     choices: [
       { id: "A", label: "Recortes, fotos, notas, flechas/conexiones" },
       { id: "B", label: "Planos de construcción oficiales" },
@@ -184,7 +184,7 @@ export const QUESTIONS: QQuestionPublic[] = [
   },
   {
     id: "D6",
-    text: "¿Qué idea instala el board sobre el caso?",
+    text: "¿Qué idea instala la investigacion sobre el caso?",
     choices: [
       { id: "A", label: "Fue un hecho aislado sin conexiones" },
       { id: "B", label: "Hay una red/patrón de casos y actores" },
@@ -202,6 +202,16 @@ export const QUESTIONS: QQuestionPublic[] = [
       { id: "B", label: "Accidente/ahogamiento con drogas no letales" },
       { id: "C", label: "Suicidio por arma de fuego" },
       { id: "D", label: "Desaparición sin cuerpo" },
+    ],
+  },
+  {
+    id: "E1.5",
+    text: "¿Cuales son las iniciales del nombre de la mujer?",
+    choices: [
+      { id: "A", label: "M. F." },
+      { id: "B", label: "T. R." },
+      { id: "C", label: "C. J." },
+      { id: "D", label: "A. P." },
     ],
   },
   {
@@ -230,16 +240,16 @@ export const QUESTIONS: QQuestionPublic[] = [
     choices: [
       { id: "A", label: "A la escuela" },
       { id: "B", label: "A la casa de Beatriz" },
-      { id: "C", label: "Al café (punto de sobres/gerente)" },
+      { id: "C", label: "Al café" },
       { id: "D", label: "A la comisaría" },
     ],
   },
   {
     id: "E5",
-    text: "¿El gerente Lagos era la cabeza?",
+    text: "¿Quien era el gerente Lagos?",
     choices: [
-      { id: "A", label: "Sí, era el líder máximo" },
-      { id: "B", label: "No, era un intermediario/eslabón" },
+      { id: "A", label: "Era el líder máximo" },
+      { id: "B", label: "Era un intermediario/eslabón" },
       { id: "C", label: "Era un testigo inocente" },
       { id: "D", label: "Era el padre de Sofía" },
     ],
@@ -261,14 +271,14 @@ export const QUESTIONS: QQuestionPublic[] = [
     text: "¿Qué comparten Sofía y la mujer del río en el “patrón” del caso?",
     choices: [
       { id: "A", label: "Solo la ciudad" },
-      { id: "B", label: "Señales de red/entorno repetido (tatuaje/sistema)" },
+      { id: "B", label: "Señales de red/entorno repetido" },
       { id: "C", label: "El mismo apellido" },
       { id: "D", label: "Que las dos eran policías" },
     ],
   },
   {
     id: "F2",
-    text: "¿Qué papel juega Eduardo (padre) en la cadena?",
+    text: "¿Qué papel juega Eduardo en la cadena?",
     choices: [
       { id: "A", label: "Es el creador original de la red" },
       { id: "B", label: "Es un actor reactivo que se obsesiona e irrumpe violentamente" },

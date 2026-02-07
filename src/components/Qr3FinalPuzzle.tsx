@@ -4,7 +4,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import styled from "styled-components";
 import { useRtdbValue } from "@/hooks/useRtdbValue";
-import { QR3_QUESTIONS_PUBLIC } from "@/data/finalQr3Quiz.public";
+import { QR3_PASS_SCORE, QR3_QUESTIONS_PUBLIC } from "@/data/finalQr3Quiz.public";
 
 type PlaySessionState = {
   phase?: "lobby" | "running" | "done";
@@ -79,7 +79,7 @@ export default function Qr3FinalPuzzle({ user, onAllDone }: Props) {
       if (j.done) {
         setSubmitOk(`Correcto. Puntaje ${j.score}/${QR3_QUESTIONS_PUBLIC.length}.`);
       } else {
-        setSubmitOk(`Puntaje ${j.score}/${QR3_QUESTIONS_PUBLIC.length}. No alcanza (${QR3_QUESTIONS_PUBLIC} mínimo).`);
+        setSubmitErr(`Puntaje ${j.score}/${QR3_QUESTIONS_PUBLIC.length}. No alcanza (${QR3_PASS_SCORE} mínimo).`);
       }
     } catch (e: any) {
       setSubmitErr(e?.message ?? "Error");

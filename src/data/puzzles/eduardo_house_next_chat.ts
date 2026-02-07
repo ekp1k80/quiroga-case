@@ -34,6 +34,25 @@ export const EDUARDO_HOUSE_NEXT_CHAT_FLOW: PuzzleFlow = {
 
     {
       prompt: [
+        "Hay bastantes papeles tirados, uno te llama la atencion...",
+        "",
+        "Un ticket de farmacia",
+      ],
+      choices: [{ id: "read", label: "Leer" }],
+      choiceReplies: {
+        read: {
+          messages: ["Farmacia \"La Bella\" - 04:07", "Ibuprofeno 400 x10", "Rivotril 2mg"],
+          advance: true,
+        },
+      },
+      check: () => true,
+      okMessages: [],
+      badMessages: ["Elegí una opción."],
+    },
+    {
+      prompt: [
+        "Seguis buscando y...",
+        "",
         "Encontrás un papel doblado.",
         "",
         "Una línea escrita rápido:",
