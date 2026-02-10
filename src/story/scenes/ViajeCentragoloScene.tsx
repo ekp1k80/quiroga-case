@@ -48,7 +48,7 @@ export default function ViajeCentragoloScene({ onDone, viaje, hospital }: Props)
           <>
             {scene !== "audio-only" && (
               <>
-                <PulsingText text="Viajando al Centrólogo" sizePx={26} pulseMs={2600} minOpacity={0.6} />
+                <PulsingText text="Viajando al Centralogo" sizePx={26} pulseMs={2600} minOpacity={0.6} />
                 <CarTravel
                   cruiseSrc="/sprites/car/car-viajando.png"
                   accelFrames={["/sprites/car/car-lose-hat1.png", "/sprites/car/car-lose-hat2.png"]}
